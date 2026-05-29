@@ -1,0 +1,14 @@
+{
+  "app": {
+    "title": "Durak Online",
+    "subtitle": "Russian card game — multiplayer in your browser"
+  },
+  "status": {
+    "connecting": "Connecting to server…",
+    "connected": "Connected",
+    "disconnected": "Disconnected"
+  },
+  "language": {
+    "switch": "עברית"
+  }
+}

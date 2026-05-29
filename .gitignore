@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Local env files (may contain secrets — see .env.example for template)
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor / OS junk
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# TypeScript build artifacts
+*.tsbuildinfo

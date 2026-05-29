@@ -1,0 +1,6 @@
+{
+  "name": "durak-shared",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Shared types and game engine for Durak Online"
+}

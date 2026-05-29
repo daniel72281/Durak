@@ -1,0 +1,69 @@
+.app {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 32px 24px;
+  text-align: center;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.header h1 {
+  margin: 0;
+}
+
+.lang-toggle {
+  font-size: 14px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: var(--accent-bg);
+  color: var(--accent);
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.lang-toggle:hover {
+  border-color: var(--accent-border);
+}
+
+.subtitle {
+  color: var(--text);
+  margin-bottom: 32px;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--code-bg);
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #999;
+}
+
+.status-dot.status-connecting {
+  background: #f5a623;
+}
+.status-dot.status-connected {
+  background: #2ecc71;
+}
+.status-dot.status-disconnected {
+  background: #e74c3c;
+}
+
+.server-message {
+  margin-top: 24px;
+  font-family: var(--mono);
+  color: var(--text-h);
+}

@@ -1,0 +1,14 @@
+{
+  "app": {
+    "title": "דוראק אונליין",
+    "subtitle": "משחק קלפים רוסי — רב משתתפים בדפדפן"
+  },
+  "status": {
+    "connecting": "מתחבר לשרת...",
+    "connected": "מחובר",
+    "disconnected": "מנותק"
+  },
+  "language": {
+    "switch": "English"
+  }
+}
