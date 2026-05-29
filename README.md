@@ -1,6 +1,6 @@
 # Durak Online
 
-Browser-based real-time multiplayer implementation of the Russian card game **Durak** (variant *Переводной / Perevodnoy* — "with pass-on").
+Browser-based real-time multiplayer implementation of the card game **Durak** (variant *Переводной / Perevodnoy* — "with pass-on").
 
 > Status: **early scaffold** — Hello-World handshake between client and server works. Game logic not yet implemented.
 

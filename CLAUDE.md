@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-**Durak Online** — browser-based real-time multiplayer implementation of the Russian card game **Durak** (variant *Переводной / Perevodnoy*, "with pass-on": the defender can pass an attack to the next player by playing a card of the same rank).
+**Durak Online** — browser-based real-time multiplayer implementation of the card game **Durak** (variant *Переводной / Perevodnoy*, "with pass-on": the defender can pass an attack to the next player by playing a card of the same rank).
+
+> User-facing copy: refer to it as just "card game" / "משחק קלפים" — do not prefix with "Russian" in the UI, README, or other user-visible text. Origin/etymology can be mentioned in internal docs only.
 
 The full plan and design decisions live in `C:\Users\daska\.claude\plans\eager-stargazing-waterfall.md`.
 

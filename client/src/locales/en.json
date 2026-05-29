@@ -1,7 +1,7 @@
 {
   "app": {
     "title": "Durak Online",
-    "subtitle": "Russian card game — multiplayer in your browser"
+    "subtitle": "Card game — multiplayer in your browser"
   },
   "status": {
     "connecting": "Connecting to server…",

@@ -2,5 +2,15 @@
   "name": "durak-shared",
   "version": "0.0.1",
   "private": true,
-  "description": "Shared types and game engine for Durak Online"
+  "description": "Shared types and game engine for Durak Online",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
 }
