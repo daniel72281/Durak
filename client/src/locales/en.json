@@ -26,6 +26,8 @@
     "pass": "Done attacking",
     "you_are_attacker": "Your turn — attack {{defender}}",
     "you_are_defender": "Defend!",
+    "you_can_throw_in": "You can throw in cards on {{defender}}",
+    "waiting_for_others": "Waiting for other players…",
     "no_legal_action_for_card": "You can't play this card right now",
     "sort_by_rank": "Sort: by rank",
     "sort_by_suit": "Sort: by suit",

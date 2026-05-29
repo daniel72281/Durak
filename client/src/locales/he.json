@@ -26,6 +26,8 @@
     "pass": "סיים התקפה",
     "you_are_attacker": "תורך — תקוף את {{defender}}",
     "you_are_defender": "להתגונן!",
+    "you_can_throw_in": "אפשר לזרוק קלפים על {{defender}}",
+    "waiting_for_others": "ממתינים לשחקנים האחרים…",
     "no_legal_action_for_card": "אי אפשר לשחק את הקלף הזה עכשיו",
     "sort_by_rank": "מיון: לפי דרגה",
     "sort_by_suit": "מיון: לפי צורה",

@@ -31,6 +31,13 @@
   text-align: center;
 }
 
+.role-banner--muted {
+  background: transparent;
+  color: var(--muted, #888);
+  font-weight: 400;
+  font-style: italic;
+}
+
 .hand-section {
   width: 100%;
   display: flex;

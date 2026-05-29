@@ -148,13 +148,41 @@ function GamePanel({ state, onAction, onShowError }: Props) {
           <TurnTimer deadline={state.turnDeadline} />
         </div>
 
-        {(isDefender || state.selfIndex === state.attackerIndex) && (
-          <div className="role-banner">
-            {isDefender
-              ? t('game.you_are_defender')
-              : t('game.you_are_attacker', { defender: defenderName })}
-          </div>
-        )}
+        {!isOut && (() => {
+          // Banner priority:
+          //   1. defender → "Defend!"
+          //   2. official attacker on an empty table → "Attack X"
+          //   3. any non-defender who already passed but the round is still
+          //      open → "Waiting for other players…"
+          //   4. any non-defender with a legal card → "You can throw in on X"
+          //   (otherwise no banner — nothing useful to say)
+          if (isDefender) {
+            return <div className="role-banner">{t('game.you_are_defender')}</div>;
+          }
+          const isOfficialAttacker = state.selfIndex === state.attackerIndex;
+          if (isOfficialAttacker && state.table.length === 0) {
+            return (
+              <div className="role-banner">
+                {t('game.you_are_attacker', { defender: defenderName })}
+              </div>
+            );
+          }
+          if (haveIPassed && state.table.length > 0) {
+            return (
+              <div className="role-banner role-banner--muted">
+                {t('game.waiting_for_others')}
+              </div>
+            );
+          }
+          if (legalMoves.anyLegal && state.table.length > 0) {
+            return (
+              <div className="role-banner">
+                {t('game.you_can_throw_in', { defender: defenderName })}
+              </div>
+            );
+          }
+          return null;
+        })()}
 
         <Table
           pairs={state.table}
