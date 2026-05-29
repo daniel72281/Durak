@@ -37,9 +37,9 @@ export function canDefend(
 // Maximum attacks allowed in the round (user-confirmed rule):
 //   Round 1: cap at 5 (gives defender a chance early in the game).
 //   Round 2+: cap at 6.
-// Defender hand size is intentionally NOT a factor — the only ceiling is
-// the per-round cap. If the defender runs out of cards mid-round, they
-// have to take whatever is on the table.
+// The effective ceiling is min(roundAttackLimit, defenderHandSize) — see
+// canAttackCard. The defender cannot be attacked with more cards than
+// they hold (otherwise they're set up to fail no matter what).
 export function computeRoundAttackLimit(roundNumber: number): number {
   return roundNumber === 1 ? 5 : 6;
 }
@@ -57,12 +57,15 @@ export function rankIsOnTable(card: Card, table: readonly TablePair[]): boolean 
 // Is `card` a legal attack/throw-in right now?
 //   - Table empty: any card is a legal opening attack.
 //   - Otherwise:   card's rank must match some rank already on the table.
-//   - Total attacks must stay under `roundAttackLimit` (5 in round 1,
-//     6 in round 2+).
-//   - **No attacks may be added to a defender with zero cards** —
-//     pass `Number.POSITIVE_INFINITY` for `defenderHandSize` when the
-//     defender has already declared 'take' (in that case they're
-//     collecting everything, so hand size doesn't matter).
+//   - Total attacks must stay under min(roundAttackLimit, defenderHandSize):
+//     the defender can never be attacked with more cards than they hold,
+//     and the round cap (5 in round 1, 6 in round 2+) is an additional
+//     hard ceiling.
+//   - Callers should pass `Number.POSITIVE_INFINITY` for `defenderHandSize`
+//     when the defender has already declared 'take' — in that case they're
+//     collecting everything, so hand size doesn't matter and only the
+//     round cap applies. (This also covers the 0-card-defender-while-taking
+//     case: throw-ins keep working.)
 //
 // Note: this does not check WHO is playing the card. The caller (engine)
 // enforces that the opening attack comes from `attackerIndex` and that
@@ -73,8 +76,8 @@ export function canAttackCard(
   defenderHandSize: number,
   roundAttackLimit: number,
 ): boolean {
-  if (table.length >= roundAttackLimit) return false;
-  if (defenderHandSize <= 0) return false;
+  const effectiveLimit = Math.min(roundAttackLimit, defenderHandSize);
+  if (table.length >= effectiveLimit) return false;
   if (table.length === 0) return true;
   return rankIsOnTable(card, table);
 }
