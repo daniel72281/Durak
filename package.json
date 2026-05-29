@@ -1,0 +1,13 @@
+{
+  "name": "durak",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Durak Online — root manifest so Railway (Nixpacks) detects this as a Node project. The actual server lives in ./server.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "cd server && npm ci",
+    "start": "cd server && npm start"
+  }
+}
