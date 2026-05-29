@@ -1,14 +1,48 @@
 {
   "app": {
-    "title": "Durak Online",
+    "title": "Durak",
     "subtitle": "Card game — multiplayer in your browser"
-  },
-  "status": {
-    "connecting": "Connecting to server…",
-    "connected": "Connected",
-    "disconnected": "Disconnected"
   },
   "language": {
     "switch": "עברית"
+  },
+  "home": {
+    "nickname": "Your nickname",
+    "nickname_placeholder": "e.g. Alice",
+    "create_room": "Create a room",
+    "join_room": "Join a room",
+    "max_players": "Max players",
+    "room_code": "Room code",
+    "create_button": "Create",
+    "join_button": "Join",
+    "error_nickname_required": "Nickname is required",
+    "error_code_format": "Room code must be 4 letters"
+  },
+  "room": {
+    "room_code": "Room code",
+    "max_players_label": "Max players: {{max}}",
+    "players_joined": "{{count}} / {{max}} players joined",
+    "owner_badge": "owner",
+    "waiting_for_owner": "Waiting for the room owner to start the game…",
+    "start_game": "Start game",
+    "start_failed": "Could not start game",
+    "close_room": "Close room",
+    "leave_room": "Leave room",
+    "connecting": "Connecting…",
+    "timeout_title": "Could not reach the room",
+    "timeout_message": "The room may have been closed or the server restarted. Please go back and try again.",
+    "leave_confirm_title": "Leave room?",
+    "leave_confirm_message": "Are you sure you want to leave this room?",
+    "leave_confirm_yes": "Yes, leave",
+    "leave_confirm_no": "Stay",
+    "close_confirm_title": "Close room?",
+    "close_confirm_message": "Are you sure you want to close this room? All players will be disconnected.",
+    "close_confirm_yes": "Yes, close",
+    "close_confirm_no": "Cancel",
+    "closed_title": "Room closed",
+    "closed_owner_closed": "The room owner closed the room.",
+    "closed_owner_left": "The room owner left.",
+    "closed_player_left": "A player left during the game.",
+    "back_home": "Back to home"
   }
 }

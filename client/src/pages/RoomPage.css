@@ -1,0 +1,109 @@
+.room-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+  text-align: center;
+}
+
+.room-loading {
+  text-align: center;
+  color: var(--text);
+  padding: 40px 0;
+}
+
+.room-code-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin: 24px 0;
+}
+
+.room-code-label {
+  font-size: 14px;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.room-code {
+  font-family: var(--mono);
+  font-size: 56px;
+  font-weight: 600;
+  letter-spacing: 6px;
+  color: var(--accent);
+  background: var(--accent-bg);
+  padding: 8px 24px;
+  border-radius: 8px;
+}
+
+.room-meta {
+  margin: 0;
+  color: var(--text);
+  font-size: 15px;
+}
+
+.room-waiting-msg {
+  margin: 16px 0;
+  color: var(--text);
+  font-style: italic;
+}
+
+.room-player-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+}
+
+.room-player-list li {
+  padding: 6px 16px;
+  background: var(--code-bg);
+  border-radius: 999px;
+  font-size: 15px;
+  color: var(--text-h);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  background: var(--accent);
+  color: white;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.room-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.room-closed {
+  text-align: center;
+  padding: 40px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.room-closed h2 {
+  margin: 0;
+  color: var(--text-h);
+}
+
+.room-closed p {
+  margin: 0;
+  color: var(--text);
+}

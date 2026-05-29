@@ -1,14 +1,48 @@
 {
   "app": {
-    "title": "דוראק אונליין",
+    "title": "דוראק",
     "subtitle": "משחק קלפים — רב משתתפים בדפדפן"
-  },
-  "status": {
-    "connecting": "מתחבר לשרת...",
-    "connected": "מחובר",
-    "disconnected": "מנותק"
   },
   "language": {
     "switch": "English"
+  },
+  "home": {
+    "nickname": "הכינוי שלך",
+    "nickname_placeholder": "לדוגמה: אלון",
+    "create_room": "צור חדר",
+    "join_room": "הצטרף לחדר",
+    "max_players": "מקס׳ שחקנים",
+    "room_code": "קוד חדר",
+    "create_button": "צור",
+    "join_button": "הצטרף",
+    "error_nickname_required": "חובה להזין כינוי",
+    "error_code_format": "קוד חדר חייב להיות 4 אותיות"
+  },
+  "room": {
+    "room_code": "קוד חדר",
+    "max_players_label": "מקסימום שחקנים: {{max}}",
+    "players_joined": "{{count}} / {{max}} שחקנים בחדר",
+    "owner_badge": "בעלים",
+    "waiting_for_owner": "ממתינים שבעל החדר יתחיל את המשחק…",
+    "start_game": "התחל משחק",
+    "start_failed": "לא ניתן להתחיל משחק",
+    "close_room": "סגור חדר",
+    "leave_room": "עזוב חדר",
+    "connecting": "מתחבר…",
+    "timeout_title": "לא הצלחנו להתחבר לחדר",
+    "timeout_message": "ייתכן שהחדר נסגר או שהשרת אותחל. חזור לעמוד הבית ונסה שוב.",
+    "leave_confirm_title": "לעזוב את החדר?",
+    "leave_confirm_message": "אתה בטוח שאתה רוצה לעזוב את החדר?",
+    "leave_confirm_yes": "כן, עזוב",
+    "leave_confirm_no": "השאר",
+    "close_confirm_title": "לסגור את החדר?",
+    "close_confirm_message": "אתה בטוח שאתה רוצה לסגור את החדר? כל השחקנים ינותקו.",
+    "close_confirm_yes": "כן, סגור",
+    "close_confirm_no": "ביטול",
+    "closed_title": "החדר נסגר",
+    "closed_owner_closed": "בעל החדר סגר את החדר.",
+    "closed_owner_left": "בעל החדר עזב.",
+    "closed_player_left": "שחקן עזב במהלך המשחק.",
+    "back_home": "חזרה לעמוד הבית"
   }
 }

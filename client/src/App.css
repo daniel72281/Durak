@@ -1,19 +1,29 @@
-.app {
+.app-shell {
   max-width: 720px;
   margin: 0 auto;
-  padding: 32px 24px;
-  text-align: center;
+  padding: 24px 16px;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
 }
 
-.header {
+.app-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
 }
 
-.header h1 {
+.app-title {
   margin: 0;
+  font-size: 28px;
+  color: var(--text-h);
+}
+
+.app-main {
+  flex: 1;
 }
 
 .lang-toggle {
@@ -31,39 +41,44 @@
   border-color: var(--accent-border);
 }
 
-.subtitle {
-  color: var(--text);
-  margin-bottom: 32px;
+button.primary {
+  background: var(--accent);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: opacity 0.2s;
 }
 
-.status {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
+button.primary:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+button.primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+button.danger {
+  background: transparent;
+  color: #c0392b;
+  border: 1px solid #c0392b;
   padding: 8px 16px;
-  border-radius: 999px;
-  background: var(--code-bg);
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s;
 }
 
-.status-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #999;
+button.danger:hover {
+  background-color: rgba(192, 57, 43, 0.1);
 }
 
-.status-dot.status-connecting {
-  background: #f5a623;
-}
-.status-dot.status-connected {
-  background: #2ecc71;
-}
-.status-dot.status-disconnected {
-  background: #e74c3c;
-}
-
-.server-message {
-  margin-top: 24px;
-  font-family: var(--mono);
-  color: var(--text-h);
+@media (prefers-color-scheme: dark) {
+  button.danger {
+    color: #e74c3c;
+    border-color: #e74c3c;
+  }
 }
