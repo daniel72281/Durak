@@ -2,13 +2,18 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { RoomClosedReason, RoomStatePayload } from '@shared/wire';
+import type { Action, ClientGameState } from '@shared/types';
 import {
   socket,
   getLatestRoomState,
   getLatestRoomClosed,
+  getLatestGameState,
   clearRoomCache,
 } from '../socket';
 import ConfirmDialog from '../components/ConfirmDialog';
+import GamePanel from '../components/GamePanel';
+import GameOverDialog from '../components/GameOverDialog';
+import Toast from '../components/Toast';
 import './RoomPage.css';
 
 interface NavState {
@@ -24,11 +29,12 @@ function RoomPage() {
   const navigate = useNavigate();
   const navState = (location.state ?? null) as NavState | null;
 
-  // Initialise from the module-level cache so we don't miss the room:state
-  // emitted right after room:create/join (race between server emit and
-  // RoomPage mount).
   const [roomState, setRoomState] = useState<RoomStatePayload | null>(() => {
     const cached = getLatestRoomState();
+    return cached && cached.roomId === roomId ? cached : null;
+  });
+  const [gameState, setGameState] = useState<ClientGameState | null>(() => {
+    const cached = getLatestGameState();
     return cached && cached.roomId === roomId ? cached : null;
   });
   const [closedReason, setClosedReason] = useState<RoomClosedReason | null>(
@@ -37,44 +43,43 @@ function RoomPage() {
   const [timedOut, setTimedOut] = useState(false);
   const [showLeave, setShowLeave] = useState(false);
   const [showClose, setShowClose] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const hasJoinedRef = useRef(false);
 
-  // Redirect to home if nav state is missing (e.g. browser refresh wiped it).
   useEffect(() => {
     if (!navState?.nickname || !navState.playerId || !roomId) {
       navigate('/', { replace: true });
     }
   }, [navState, navigate, roomId]);
 
-  // Listen for room state + closed events.
   useEffect(() => {
-    const onState = (s: RoomStatePayload) => {
+    const onRoomState = (s: RoomStatePayload) => {
       if (s.roomId === roomId) setRoomState(s);
     };
+    const onGameState = (s: ClientGameState) => {
+      if (s.roomId === roomId) setGameState(s);
+    };
     const onClosed = (p: { reason: RoomClosedReason }) => setClosedReason(p.reason);
-    socket.on('room:state', onState);
+    socket.on('room:state', onRoomState);
+    socket.on('game:state', onGameState);
     socket.on('room:closed', onClosed);
     return () => {
-      socket.off('room:state', onState);
+      socket.off('room:state', onRoomState);
+      socket.off('game:state', onGameState);
       socket.off('room:closed', onClosed);
     };
   }, [roomId]);
 
-  // Mark as joined once we've received our first room:state.
   useEffect(() => {
     if (roomState) hasJoinedRef.current = true;
   }, [roomState]);
 
-  // Safety timeout: if we don't get a room:state within 5 seconds and aren't
-  // already joined, something is wrong (server lost the room, network issue).
-  // Surface a clear error rather than spinning forever.
   useEffect(() => {
     if (roomState || closedReason) return;
-    const t = setTimeout(() => setTimedOut(true), 5000);
-    return () => clearTimeout(t);
+    const tmr = setTimeout(() => setTimedOut(true), 5000);
+    return () => clearTimeout(tmr);
   }, [roomState, closedReason]);
 
-  // Clear the cache when leaving the page so a future visit starts clean.
   useEffect(() => () => clearRoomCache(), []);
 
   const goHome = () => navigate('/', { replace: true });
@@ -95,10 +100,13 @@ function RoomPage() {
 
   const handleStartGame = () => {
     socket.emit('game:start', {}, (ack) => {
-      if (!ack.ok) {
-        // Stage 1 still returns "not implemented"; surface it for now.
-        alert(`${t('room.start_failed')}: ${ack.error}`);
-      }
+      if (!ack.ok) setToastMessage(`${t('room.start_failed')}: ${ack.error}`);
+    });
+  };
+
+  const handleGameAction = (action: Action) => {
+    socket.emit('game:action', action, (ack) => {
+      if (!ack.ok) setToastMessage(ack.error);
     });
   };
 
@@ -134,6 +142,53 @@ function RoomPage() {
     return <div className="room-loading">{t('room.connecting')}</div>;
   }
 
+  // --- In-game view ---
+  if (roomState.isPlaying && gameState) {
+    return (
+      <>
+        <GamePanel
+          state={gameState}
+          onAction={handleGameAction}
+          onShowError={setToastMessage}
+        />
+        <div className="in-game-actions">
+          <button
+            type="button"
+            className="danger"
+            onClick={() => setShowLeave(true)}
+          >
+            {t('room.leave_room')}
+          </button>
+        </div>
+        {gameState.phase === 'finished' && (
+          <GameOverDialog
+            state={gameState}
+            isOwner={roomState.selfPlayerId === roomState.ownerId}
+            onPlayAgain={() => {
+              socket.emit('game:restart', {}, (ack) => {
+                if (!ack.ok) setToastMessage(ack.error);
+              });
+            }}
+            onBackHome={() => {
+              socket.emit('room:leave', {}, () => goHome());
+            }}
+          />
+        )}
+        <ConfirmDialog
+          open={showLeave}
+          title={t('room.leave_confirm_title')}
+          message={t('room.leave_confirm_message')}
+          confirmLabel={t('room.leave_confirm_yes')}
+          cancelLabel={t('room.leave_confirm_no')}
+          onConfirm={confirmLeave}
+          onCancel={() => setShowLeave(false)}
+        />
+        <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />
+      </>
+    );
+  }
+
+  // --- Waiting-room view ---
   const isOwner = roomState.selfPlayerId === roomState.ownerId;
   const canStart = isOwner && roomState.playerCount >= 2 && !roomState.isPlaying;
 
@@ -159,7 +214,9 @@ function RoomPage() {
           {roomState.players.map((p) => (
             <li key={p.id}>
               {p.nickname}
-              {p.id === roomState.ownerId && <span className="badge">{t('room.owner_badge')}</span>}
+              {p.id === roomState.ownerId && (
+                <span className="badge">{t('room.owner_badge')}</span>
+              )}
             </li>
           ))}
         </ul>
@@ -217,6 +274,7 @@ function RoomPage() {
         onConfirm={confirmClose}
         onCancel={() => setShowClose(false)}
       />
+      <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />
     </div>
   );
 }

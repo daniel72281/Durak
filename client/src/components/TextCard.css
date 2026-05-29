@@ -1,0 +1,110 @@
+.text-card {
+  position: relative;
+  display: inline-block;
+  width: 52px;
+  height: 72px;
+  padding: 0;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: var(--mono);
+  user-select: none;
+  /* Cards always render LTR so the corner index stays in the same place
+     regardless of UI language. */
+  direction: ltr;
+  vertical-align: top;
+}
+
+.text-card.small {
+  width: 36px;
+  height: 50px;
+}
+
+.text-card.red { color: #c0392b; }
+.text-card.black { color: #1a1a1a; }
+
+.text-card.trump {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.text-card.clickable {
+  cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+
+.text-card.clickable:hover:not(:disabled) {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.text-card.clickable:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.text-card .corner {
+  position: absolute;
+  line-height: 1;
+}
+
+.text-card .corner.top-left {
+  top: 3px;
+  left: 4px;
+}
+
+.text-card .corner.bottom-right {
+  bottom: 3px;
+  right: 4px;
+  transform: rotate(180deg);
+}
+
+.corner-index {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  font-weight: 600;
+}
+
+.corner-index .rank {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.corner-index .suit {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.text-card.small .corner-index .rank,
+.text-card.small .corner-index .suit {
+  font-size: 10px;
+}
+
+.text-card .center-suit {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 26px;
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+.text-card.small .center-suit {
+  font-size: 18px;
+}
+
+.text-card-back {
+  display: inline-block;
+  font-size: 36px;
+  color: #555;
+  min-width: 30px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .text-card {
+    background: #f8f8f8;
+  }
+}

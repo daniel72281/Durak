@@ -107,3 +107,9 @@
   margin: 0;
   color: var(--text);
 }
+
+.in-game-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
+}

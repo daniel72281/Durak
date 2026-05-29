@@ -1,0 +1,9 @@
+.hand {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding: 8px;
+  /* Always LTR — trumps stay physically right regardless of UI language. */
+  direction: ltr;
+}

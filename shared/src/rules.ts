@@ -34,17 +34,14 @@ export function canDefend(
   return defenderHand.some((c) => beats(attack, c, trumpSuit));
 }
 
-// Maximum attacks allowed in the round.
+// Maximum attacks allowed in the round (user-confirmed rule):
 //   Round 1: cap at 5 (gives defender a chance early in the game).
 //   Round 2+: cap at 6.
-// Always further limited by the defender's hand size — you can't be attacked
-// with more cards than you could possibly defend.
-export function computeRoundAttackLimit(
-  roundNumber: number,
-  defenderHandSize: number,
-): number {
-  const cap = roundNumber === 1 ? 5 : 6;
-  return Math.min(cap, defenderHandSize);
+// Defender hand size is intentionally NOT a factor — the only ceiling is
+// the per-round cap. If the defender runs out of cards mid-round, they
+// have to take whatever is on the table.
+export function computeRoundAttackLimit(roundNumber: number): number {
+  return roundNumber === 1 ? 5 : 6;
 }
 
 // Is `card`'s rank already represented somewhere on the table (attack or defense)?
@@ -59,9 +56,10 @@ export function rankIsOnTable(card: Card, table: readonly TablePair[]): boolean 
 
 // Is `card` a legal attack/throw-in right now?
 //   - Table empty: any card is a legal opening attack.
-//   - Otherwise:   card's rank must match some rank already on the table,
-//                  AND table.length must be below both the round limit
-//                  and the defender's current hand size.
+//   - Otherwise:   card's rank must match some rank already on the table.
+//   - Total attacks must stay under `roundAttackLimit` (5 in round 1,
+//     6 in round 2+). Defender's hand size does NOT cap throw-ins —
+//     if they run out of cards they are forced to take.
 //
 // Note: this does not check WHO is playing the card. The caller (engine)
 // enforces that the opening attack comes from `attackerIndex` and that
@@ -69,11 +67,9 @@ export function rankIsOnTable(card: Card, table: readonly TablePair[]): boolean 
 export function canAttackCard(
   card: Card,
   table: readonly TablePair[],
-  defenderHandSize: number,
   roundAttackLimit: number,
 ): boolean {
   if (table.length >= roundAttackLimit) return false;
-  if (table.length >= defenderHandSize) return false;
   if (table.length === 0) return true;
   return rankIsOnTable(card, table);
 }

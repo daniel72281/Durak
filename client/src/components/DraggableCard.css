@@ -1,0 +1,15 @@
+.draggable-card-wrap {
+  display: inline-block;
+  border-radius: 6px;
+  transition: transform 0.12s, box-shadow 0.12s;
+  /* The actual TextCard already has its own border; we add the "legal" hint here. */
+}
+
+.draggable-card-wrap.legal {
+  transform: translateY(-6px);
+  box-shadow: 0 0 0 2px var(--accent), 0 4px 10px rgba(170, 59, 255, 0.25);
+}
+
+.draggable-card-wrap.legal:hover {
+  transform: translateY(-9px);
+}

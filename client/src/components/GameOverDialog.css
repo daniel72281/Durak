@@ -1,0 +1,159 @@
+.game-over-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.game-over-dialog {
+  background: var(--bg);
+  color: var(--text);
+  padding: 28px 32px;
+  border-radius: 12px;
+  max-width: 460px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  align-items: center;
+}
+
+.game-over-dialog h2 {
+  margin: 0;
+  color: var(--text-h);
+  font-size: 28px;
+}
+
+.game-over-dialog h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text);
+}
+
+.game-over-result {
+  margin: 0;
+  font-size: 18px;
+  color: var(--text-h);
+  font-weight: 600;
+}
+
+.ranking, .scoreboard {
+  width: 100%;
+}
+
+.ranking-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ranking-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  background: var(--code-bg);
+  font-size: 15px;
+  text-align: left;
+}
+
+.ranking-list li.winner {
+  border-left: 3px solid #2ecc71;
+}
+
+.ranking-list li.durak {
+  border-left: 3px solid #c0392b;
+  background: rgba(192, 57, 43, 0.08);
+}
+
+.ranking-list .place {
+  font-family: var(--mono);
+  font-weight: 700;
+  min-width: 24px;
+  color: var(--text-h);
+}
+
+.ranking-list .name {
+  flex: 1;
+  color: var(--text-h);
+}
+
+.ranking-list .durak-tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  background: #c0392b;
+  color: white;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.scoreboard table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.scoreboard th {
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text);
+  padding: 6px 8px;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+}
+
+.scoreboard th:first-child {
+  text-align: left;
+}
+
+.scoreboard td {
+  padding: 8px;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-h);
+}
+
+.scoreboard td:first-child {
+  text-align: left;
+  font-weight: 500;
+}
+
+.scoreboard tr.me {
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.scoreboard tr.me td {
+  color: var(--accent);
+}
+
+.game-over-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.waiting-restart {
+  margin: 0;
+  font-style: italic;
+  color: var(--text);
+  font-size: 14px;
+  padding: 8px;
+}

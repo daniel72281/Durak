@@ -1,0 +1,54 @@
+.game-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+}
+
+.game-meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.trump-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.role-banner {
+  padding: 8px 16px;
+  border-radius: 6px;
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-size: 15px;
+  font-weight: 500;
+  text-align: center;
+}
+
+.hand-section {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.hand-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.hand-label {
+  font-size: 13px;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}

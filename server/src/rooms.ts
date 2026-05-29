@@ -4,7 +4,7 @@
 // Each room tracks its owner, max player count, list of joined players, and
 // (later, in stage 2) the running GameState.
 
-import type { GameState } from '../../shared/src/types';
+import type { GameState, PlayerScore } from '../../shared/src/types';
 
 interface RoomPlayer {
   id: string;
@@ -18,6 +18,11 @@ export interface Room {
   maxPlayers: number;
   players: RoomPlayer[];
   game: GameState | null;
+  // Cumulative wins/duraks per playerId across all games played in the room.
+  scoreboard: Map<string, PlayerScore>;
+  // Tracks whether the most recently finished game has already been scored
+  // (to avoid double-counting if multiple events touch the same final state).
+  scoredCurrentGame: boolean;
 }
 
 const rooms = new Map<string, Room>();
@@ -68,6 +73,8 @@ export function createRoom(
     maxPlayers,
     players: [{ id: playerId, nickname: clean, socketId }],
     game: null,
+    scoreboard: new Map([[playerId, { wins: 0, duraks: 0 }]]),
+    scoredCurrentGame: false,
   });
   playerToRoom.set(playerId, roomId);
   return { ok: true, roomId, playerId };
@@ -97,6 +104,7 @@ export function joinRoom(
   }
   const playerId = generatePlayerId();
   room.players.push({ id: playerId, nickname: clean, socketId });
+  room.scoreboard.set(playerId, { wins: 0, duraks: 0 });
   playerToRoom.set(playerId, roomId);
   return { ok: true, playerId, roomId };
 }

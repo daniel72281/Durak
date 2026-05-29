@@ -73,6 +73,7 @@ export function createGame(
     roundAttackLimit: 0,
     passedPlayerIds: [],
     defenderTaking: false,
+    outOrder: [],
     loser: null,
   };
 }
@@ -93,10 +94,7 @@ export function startGame(state: GameState, shuffledDeck: readonly Card[]): Engi
   }));
   const attackerIndex = findFirstAttacker(players, deal.trumpSuit);
   const defenderIndex = nextActivePlayerIndex(players, attackerIndex);
-  const roundAttackLimit = computeRoundAttackLimit(
-    1,
-    players[defenderIndex]!.hand.length,
-  );
+  const roundAttackLimit = computeRoundAttackLimit(1);
   return ok({
     ...state,
     phase: 'playing',
@@ -138,13 +136,55 @@ function findFirstAttacker(players: readonly Player[], trumpSuit: Suit): number 
 
 export function applyAction(state: GameState, action: Action): EngineResult {
   if (state.phase !== 'playing') return fail('game is not in playing phase');
+  let result: EngineResult;
   switch (action.type) {
-    case 'attack':   return handleAttack(state, action);
-    case 'defend':   return handleDefend(state, action);
-    case 'transfer': return handleTransfer(state, action);
-    case 'take':     return handleTake(state, action);
-    case 'pass':     return handlePass(state, action);
+    case 'attack':   result = handleAttack(state, action); break;
+    case 'defend':   result = handleDefend(state, action); break;
+    case 'transfer': result = handleTransfer(state, action); break;
+    case 'take':     result = handleTake(state, action); break;
+    case 'pass':     result = handlePass(state, action); break;
   }
+  if (!result.ok) return result;
+  // After every action that reduces a hand, check whether anyone has emptied
+  // their hand with the deck already exhausted — they're out, and the game
+  // may be over (one player left with cards = the durak). This is on top of
+  // the round-transition check in completeRound and lets a winning play
+  // (e.g. defender uses last card to defend; deck empty) end the game
+  // immediately in a 2-player game rather than waiting for an explicit pass.
+  return ok(checkMidActionGameEnd(result.state));
+}
+
+// If the deck is empty and a player's hand has just become empty, mark them
+// out. If exactly one active player remains, end the game with that player
+// as the durak. Returns the (possibly updated) state.
+function checkMidActionGameEnd(state: GameState): GameState {
+  if (state.phase !== 'playing') return state;
+  if (state.deck.length > 0) return state;
+  const newOutOrder = [...state.outOrder];
+  let mutated = false;
+  const players = state.players.map((p) => {
+    if (!p.isOut && p.hand.length === 0) {
+      mutated = true;
+      newOutOrder.push(p.id);
+      return { ...p, isOut: true };
+    }
+    return p;
+  });
+  if (!mutated) return state;
+  const withCards = players.filter((p) => p.hand.length > 0);
+  if (withCards.length === 1) {
+    return {
+      ...state,
+      players,
+      outOrder: newOutOrder,
+      phase: 'finished',
+      loser: withCards[0]!.id,
+    };
+  }
+  if (withCards.length === 0) {
+    return { ...state, players, outOrder: newOutOrder, phase: 'finished', loser: null };
+  }
+  return { ...state, players, outOrder: newOutOrder };
 }
 
 // ---------------------------------------------------------------------------
@@ -168,14 +208,7 @@ function handleAttack(
   const player = state.players[playerIdx]!;
   if (!hasCard(player.hand, action.card)) return fail('card not in hand');
 
-  // While defender is taking, throw-ins are still capped by roundAttackLimit
-  // but no longer constrained by defender hand size (they aren't defending).
-  const defenderHand = state.players[state.defenderIndex]!.hand.length;
-  const effectiveDefenderHand = state.defenderTaking
-    ? Number.POSITIVE_INFINITY
-    : defenderHand;
-
-  if (!canAttackCard(action.card, state.table, effectiveDefenderHand, state.roundAttackLimit)) {
+  if (!canAttackCard(action.card, state.table, state.roundAttackLimit)) {
     return fail('card is not a legal attack now');
   }
 
@@ -248,10 +281,7 @@ function handleTransfer(
     ...defender,
     hand: removeCard(defender.hand, action.card),
   });
-  const newRoundAttackLimit = computeRoundAttackLimit(
-    state.roundNumber,
-    newPlayers[newDefenderIdx]!.hand.length,
-  );
+  const newRoundAttackLimit = computeRoundAttackLimit(state.roundNumber);
   return ok({
     ...state,
     players: newPlayers,
@@ -339,11 +369,16 @@ function completeRound(state: GameState): GameState {
     deck = remaining;
   }
 
-  // 3. Mark players who are out (hand empty AND deck empty).
-  players = players.map((p) => ({
-    ...p,
-    isOut: p.hand.length === 0 && deck.length === 0,
-  }));
+  // 3. Mark players who are out (hand empty AND deck empty), tracking the
+  // order they emptied so the end-of-game ranking is meaningful.
+  const newOutOrder = [...state.outOrder];
+  players = players.map((p) => {
+    const becomingOut = p.hand.length === 0 && deck.length === 0;
+    if (becomingOut && !p.isOut && !newOutOrder.includes(p.id)) {
+      newOutOrder.push(p.id);
+    }
+    return { ...p, isOut: becomingOut };
+  });
 
   // 4. Game over?
   const durakId = findDurak(players, deck.length);
@@ -356,6 +391,7 @@ function completeRound(state: GameState): GameState {
       table: [],
       passedPlayerIds: [],
       defenderTaking: false,
+      outOrder: newOutOrder,
       phase: 'finished',
       loser: durakId,
     };
@@ -371,6 +407,7 @@ function completeRound(state: GameState): GameState {
       table: [],
       passedPlayerIds: [],
       defenderTaking: false,
+      outOrder: newOutOrder,
       phase: 'finished',
       loser: null,
     };
@@ -385,10 +422,7 @@ function completeRound(state: GameState): GameState {
   }
 
   const nextRoundNumber = state.roundNumber + 1;
-  const nextRoundAttackLimit = computeRoundAttackLimit(
-    nextRoundNumber,
-    players[nextDefenderIdx]?.hand.length ?? 0,
-  );
+  const nextRoundAttackLimit = computeRoundAttackLimit(nextRoundNumber);
 
   return {
     ...state,
@@ -398,6 +432,7 @@ function completeRound(state: GameState): GameState {
     table: [],
     passedPlayerIds: [],
     defenderTaking: false,
+    outOrder: newOutOrder,
     attackerIndex: nextAttackerIdx,
     defenderIndex: nextDefenderIdx,
     roundNumber: nextRoundNumber,

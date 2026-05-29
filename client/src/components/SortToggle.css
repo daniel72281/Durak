@@ -1,0 +1,16 @@
+.sort-toggle {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.sort-toggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}

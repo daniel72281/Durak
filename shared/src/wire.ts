@@ -81,6 +81,10 @@ export interface ClientToServerEvents {
     payload: Record<string, never>,
     ack: (r: AckResult) => void,
   ) => void;
+  'game:restart': (
+    payload: Record<string, never>,
+    ack: (r: AckResult) => void,
+  ) => void;
   'game:action': (
     payload: Action,
     ack: (r: AckResult) => void,

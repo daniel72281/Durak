@@ -86,19 +86,13 @@ describe('canDefend', () => {
 });
 
 describe('computeRoundAttackLimit', () => {
-  it('caps round 1 at 5 regardless of player count', () => {
-    expect(computeRoundAttackLimit(1, 6)).toBe(5);
-    expect(computeRoundAttackLimit(1, 10)).toBe(5);
+  it('caps round 1 at 5', () => {
+    expect(computeRoundAttackLimit(1)).toBe(5);
   });
 
   it('caps round 2+ at 6', () => {
-    expect(computeRoundAttackLimit(2, 6)).toBe(6);
-    expect(computeRoundAttackLimit(99, 10)).toBe(6);
-  });
-
-  it('returns defender hand size when that is the tighter limit', () => {
-    expect(computeRoundAttackLimit(1, 3)).toBe(3);
-    expect(computeRoundAttackLimit(5, 2)).toBe(2);
+    expect(computeRoundAttackLimit(2)).toBe(6);
+    expect(computeRoundAttackLimit(99)).toBe(6);
   });
 });
 
@@ -126,29 +120,31 @@ describe('rankIsOnTable', () => {
 
 describe('canAttackCard', () => {
   it('opening attack: any card on empty table', () => {
-    expect(canAttackCard(c('6', 'hearts'), [], 6, 5)).toBe(true);
+    expect(canAttackCard(c('6', 'hearts'), [], 5)).toBe(true);
   });
 
   it('throw-in: must match a rank already on the table', () => {
     const table = [pair(c('7', 'spades'))];
-    expect(canAttackCard(c('7', 'hearts'), table, 6, 5)).toBe(true);
-    expect(canAttackCard(c('8', 'hearts'), table, 6, 5)).toBe(false);
+    expect(canAttackCard(c('7', 'hearts'), table, 5)).toBe(true);
+    expect(canAttackCard(c('8', 'hearts'), table, 5)).toBe(false);
   });
 
   it('rejects when table is at the round attack limit', () => {
     const table: TablePair[] = Array(5)
       .fill(null)
       .map(() => pair(c('7', 'spades'), c('K', 'spades')));
-    expect(canAttackCard(c('7', 'hearts'), table, 10, 5)).toBe(false);
+    expect(canAttackCard(c('7', 'hearts'), table, 5)).toBe(false);
   });
 
-  it('rejects when defender has no cards left to defend with', () => {
-    const table = [pair(c('7', 'spades'))];
-    expect(canAttackCard(c('7', 'hearts'), table, 1, 5)).toBe(false);
-  });
-
-  it('opening attack rejected if defender has zero cards (degenerate)', () => {
-    expect(canAttackCard(c('6', 'hearts'), [], 0, 5)).toBe(false);
+  it('allows throw-in regardless of defender hand size (per user rule)', () => {
+    // 3 cards on the table, 2 defended. Defender hand size is no longer a
+    // factor — only the round attack limit caps throw-ins.
+    const table: TablePair[] = [
+      pair(c('7', 'spades'), c('K', 'spades')),
+      pair(c('7', 'clubs'), c('A', 'clubs')),
+      pair(c('7', 'diamonds')),
+    ];
+    expect(canAttackCard(c('7', 'hearts'), table, 6)).toBe(true);
   });
 });
 

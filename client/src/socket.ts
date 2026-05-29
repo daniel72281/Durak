@@ -8,6 +8,7 @@ import type {
   RoomStatePayload,
   ServerToClientEvents,
 } from '@shared/wire';
+import type { ClientGameState } from '@shared/types';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
 
@@ -23,6 +24,7 @@ export const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(SER
 
 let latestRoomState: RoomStatePayload | null = null;
 let latestRoomClosed: RoomClosedPayload | null = null;
+let latestGameState: ClientGameState | null = null;
 
 socket.on('room:state', (s) => {
   latestRoomState = s;
@@ -32,6 +34,11 @@ socket.on('room:state', (s) => {
 socket.on('room:closed', (p) => {
   latestRoomState = null;
   latestRoomClosed = p;
+  latestGameState = null;
+});
+
+socket.on('game:state', (s) => {
+  latestGameState = s;
 });
 
 socket.on('disconnect', () => {
@@ -48,7 +55,12 @@ export function getLatestRoomClosed(): RoomClosedPayload | null {
   return latestRoomClosed;
 }
 
+export function getLatestGameState(): ClientGameState | null {
+  return latestGameState;
+}
+
 export function clearRoomCache(): void {
   latestRoomState = null;
   latestRoomClosed = null;
+  latestGameState = null;
 }

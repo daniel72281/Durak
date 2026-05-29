@@ -8,7 +8,16 @@ import type {
   RoomStatePayload,
   ServerToClientEvents,
 } from '../../shared/src/wire';
+import { applyAction, createGame, startGame } from '../../shared/src/engine';
+import { createDeck, shuffle } from '../../shared/src/deck';
 import * as rooms from './rooms';
+import { filterGameState } from './state-filter';
+import {
+  applyExpiryAction,
+  clearTurnTimer,
+  getTurnDeadline,
+  startTurnTimer,
+} from './turnTimer';
 
 const PORT = Number(process.env.PORT) || 3002;
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
@@ -60,6 +69,7 @@ function broadcastRoomState(roomId: string): void {
 function closeRoomWithReason(roomId: string, reason: RoomClosedReason): void {
   const room = rooms.getRoom(roomId);
   if (!room) return;
+  clearTurnTimer(roomId);
   for (const p of room.players) {
     // Remove the socket→player mapping so the disconnect handler doesn't
     // try to leave the room again.
@@ -69,6 +79,58 @@ function closeRoomWithReason(roomId: string, reason: RoomClosedReason): void {
   }
   io.to(roomId).emit('room:closed', { reason });
   rooms.closeRoom(roomId);
+}
+
+// Updates the per-room scoreboard with the just-finished game's result.
+// Idempotent via room.scoredCurrentGame so we don't double-count if
+// multiple events touch the same final state.
+function commitScoreIfFinished(room: rooms.Room): void {
+  if (!room.game || room.game.phase !== 'finished') return;
+  if (room.scoredCurrentGame) return;
+  const loserId = room.game.loser;
+  for (const p of room.players) {
+    const score = room.scoreboard.get(p.id) ?? { wins: 0, duraks: 0 };
+    if (p.id === loserId) {
+      room.scoreboard.set(p.id, { wins: score.wins, duraks: score.duraks + 1 });
+    } else {
+      room.scoreboard.set(p.id, { wins: score.wins + 1, duraks: score.duraks });
+    }
+  }
+  room.scoredCurrentGame = true;
+}
+
+// Sends each player in the room their personalised ClientGameState.
+function broadcastGameState(roomId: string): void {
+  const room = rooms.getRoom(roomId);
+  if (!room || !room.game) return;
+  commitScoreIfFinished(room);
+  const deadline = getTurnDeadline(roomId);
+  for (const player of room.players) {
+    const view = filterGameState(room.game, player.id, room.id, deadline, room.scoreboard);
+    io.to(player.socketId).emit('game:state', view);
+  }
+}
+
+// Called when the 20s turn timer fires for a room: apply the engine's
+// default expiry action and re-broadcast.
+function handleTimerExpiry(roomId: string): void {
+  const room = rooms.getRoom(roomId);
+  if (!room || !room.game) return;
+  const { result, action } = applyExpiryAction(room.game);
+  if (!result.ok) {
+    console.log(`[timer] room=${roomId} expiry action failed: ${result.error}`);
+    return;
+  }
+  if (action) {
+    console.log(`[timer] room=${roomId} auto-applied ${action.type}`);
+  }
+  room.game = result.state;
+  if (result.state.phase === 'playing') {
+    startTurnTimer(roomId, () => handleTimerExpiry(roomId));
+  } else {
+    clearTurnTimer(roomId);
+  }
+  broadcastGameState(roomId);
 }
 
 io.on('connection', (socket) => {
@@ -128,12 +190,91 @@ io.on('connection', (socket) => {
     ack({ ok: true });
   });
 
-  socket.on('game:start', (_payload, ack) => {
-    ack({ ok: false, error: 'not implemented yet (stage 2)' });
+  socket.on('game:restart', (_payload, ack) => {
+    const playerId = socketToPlayer.get(socket.id);
+    if (!playerId) return ack({ ok: false, error: 'not in a room' });
+    const room = rooms.getRoomByPlayer(playerId);
+    if (!room) return ack({ ok: false, error: 'not in a room' });
+    if (room.ownerId !== playerId) {
+      return ack({ ok: false, error: 'only the owner can restart' });
+    }
+    if (!room.game || room.game.phase !== 'finished') {
+      return ack({ ok: false, error: 'no finished game to restart' });
+    }
+    // Ensure final score from the just-finished game is committed before reset.
+    commitScoreIfFinished(room);
+    try {
+      const initial = createGame(
+        room.players.map((p) => ({ id: p.id, nickname: p.nickname })),
+      );
+      const shuffled = shuffle(createDeck());
+      const result = startGame(initial, shuffled);
+      if (!result.ok) return ack({ ok: false, error: result.error });
+      room.game = result.state;
+      room.scoredCurrentGame = false;
+    } catch (e) {
+      return ack({ ok: false, error: (e as Error).message });
+    }
+    console.log(`[game:restart] room=${room.id} by ${playerId}`);
+    startTurnTimer(room.id, () => handleTimerExpiry(room.id));
+    ack({ ok: true });
+    broadcastGameState(room.id);
   });
 
-  socket.on('game:action', (_action, ack) => {
-    ack({ ok: false, error: 'not implemented yet (stage 2)' });
+  socket.on('game:start', (_payload, ack) => {
+    const playerId = socketToPlayer.get(socket.id);
+    if (!playerId) return ack({ ok: false, error: 'not in a room' });
+    const room = rooms.getRoomByPlayer(playerId);
+    if (!room) return ack({ ok: false, error: 'not in a room' });
+    if (room.ownerId !== playerId) {
+      return ack({ ok: false, error: 'only the owner can start the game' });
+    }
+    if (room.game !== null) {
+      return ack({ ok: false, error: 'game already started' });
+    }
+    if (room.players.length < 2) {
+      return ack({ ok: false, error: 'need at least 2 players' });
+    }
+    try {
+      const initial = createGame(
+        room.players.map((p) => ({ id: p.id, nickname: p.nickname })),
+      );
+      const shuffled = shuffle(createDeck());
+      const result = startGame(initial, shuffled);
+      if (!result.ok) return ack({ ok: false, error: result.error });
+      room.game = result.state;
+      room.scoredCurrentGame = false;
+    } catch (e) {
+      return ack({ ok: false, error: (e as Error).message });
+    }
+    console.log(`[game:start] room=${room.id} by ${playerId}`);
+    startTurnTimer(room.id, () => handleTimerExpiry(room.id));
+    ack({ ok: true });
+    broadcastRoomState(room.id);
+    broadcastGameState(room.id);
+  });
+
+  socket.on('game:action', (action, ack) => {
+    const playerId = socketToPlayer.get(socket.id);
+    if (!playerId) return ack({ ok: false, error: 'not in a room' });
+    const room = rooms.getRoomByPlayer(playerId);
+    if (!room || !room.game) {
+      return ack({ ok: false, error: 'no active game' });
+    }
+    // Ensure the action's playerId matches the sender (no impersonation).
+    if (action.playerId !== playerId) {
+      return ack({ ok: false, error: 'cannot act on behalf of another player' });
+    }
+    const result = applyAction(room.game, action);
+    if (!result.ok) return ack({ ok: false, error: result.error });
+    room.game = result.state;
+    if (result.state.phase === 'playing') {
+      startTurnTimer(room.id, () => handleTimerExpiry(room.id));
+    } else {
+      clearTurnTimer(room.id);
+    }
+    ack({ ok: true });
+    broadcastGameState(room.id);
   });
 
   socket.on('disconnect', (reason) => {

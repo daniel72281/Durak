@@ -34,6 +34,7 @@ function makeState(overrides: Partial<GameState> = {}): GameState {
     roundAttackLimit: 5,
     passedPlayerIds: [],
     defenderTaking: false,
+    outOrder: [],
     loser: null,
   };
   return { ...base, ...overrides };

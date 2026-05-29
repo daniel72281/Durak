@@ -1,0 +1,30 @@
+.turn-timer {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--code-bg);
+  color: var(--text-h);
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 600;
+  min-width: 60px;
+}
+
+.turn-timer.urgent {
+  background: rgba(231, 76, 60, 0.15);
+  color: #c0392b;
+  animation: timer-blink 1s ease-in-out infinite;
+}
+
+@keyframes timer-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@media (prefers-color-scheme: dark) {
+  .turn-timer.urgent {
+    color: #ff6b5e;
+  }
+}

@@ -51,6 +51,10 @@ export interface GameState {
   roundAttackLimit: number; // max attacks this round (computed at round start)
   passedPlayerIds: string[]; // non-defenders who have declared "pass" this round
   defenderTaking: boolean;  // true once defender declared 'take' (more throw-ins allowed)
+  // Order in which players emptied their hand (with deck also empty) — the
+  // first id is 1st place, last is 2nd-to-last. The durak is the one NOT in
+  // this list (set as `loser` once game ends).
+  outOrder: string[];
   loser: string | null;     // player id of the durak once phase === 'finished'
 }
 
@@ -72,7 +76,13 @@ export interface PublicPlayer {
   isOut: boolean;
 }
 
+export interface PlayerScore {
+  wins: number;   // games this player finished WITHOUT being the durak
+  duraks: number; // games this player ended as the durak (loser)
+}
+
 export interface ClientGameState {
+  roomId: string;
   phase: GamePhase;
   selfHand: Card[];
   selfIndex: number;     // index of "me" in players[]
@@ -84,7 +94,16 @@ export interface ClientGameState {
   table: TablePair[];
   attackerIndex: number;
   defenderIndex: number;
+  defenderTaking: boolean;
+  passedPlayerIds: string[];
+  // Absolute epoch ms when the current required action times out, or null
+  // when no timer is active (game finished / waiting for nothing).
+  turnDeadline: number | null;
+  // Order players went out, 1st place first; durak is `loser` (not in list).
+  outOrder: string[];
   loser: string | null;
+  // Cumulative scoreboard across all games played in this room.
+  scoreboard: { [playerId: string]: PlayerScore };
 }
 
 // --- Wire payload kept from the scaffold; will be replaced by GameState

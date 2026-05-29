@@ -1,0 +1,98 @@
+.table {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  min-height: 110px;
+  padding: 16px;
+  background: rgba(34, 139, 34, 0.08);
+  border: 1px dashed rgba(34, 139, 34, 0.3);
+  border-radius: 8px;
+  direction: ltr;
+}
+
+.table-empty::before {
+  content: '—';
+  color: var(--text);
+  opacity: 0.4;
+  font-size: 24px;
+}
+
+.pair {
+  position: relative;
+  display: inline-block;
+  /* Room for the defense card to overlay diagonally without clipping. */
+  width: 70px;
+  height: 90px;
+}
+
+.pair .attack-slot {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.pair .defense-overlay {
+  /* Offset diagonally so the attack's top-left corner index stays visible. */
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  z-index: 2;
+}
+
+.pair.droppable {
+  outline: 2px dashed transparent;
+  outline-offset: 4px;
+  border-radius: 4px;
+  transition: outline-color 0.15s;
+}
+
+.pair.drop-target-active {
+  outline-color: var(--accent);
+}
+
+.transfer-zone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 80px;
+  height: 90px;
+  padding: 8px;
+  border: 2px dashed rgba(170, 59, 255, 0.4);
+  border-radius: 6px;
+  color: var(--accent);
+  font-size: 11px;
+  text-align: center;
+  background: rgba(170, 59, 255, 0.04);
+  opacity: 0.6;
+  transition: opacity 0.15s, background-color 0.15s, border-color 0.15s;
+}
+
+.transfer-zone.active {
+  opacity: 1;
+  background: rgba(170, 59, 255, 0.15);
+  border-color: var(--accent);
+}
+
+.attack-zone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 80px;
+  height: 90px;
+  padding: 8px;
+  border: 2px dashed rgba(34, 139, 34, 0.3);
+  border-radius: 6px;
+  color: var(--text);
+  opacity: 0.5;
+  font-size: 11px;
+  text-align: center;
+  transition: opacity 0.15s, background-color 0.15s, border-color 0.15s;
+}
+
+.attack-zone.active {
+  opacity: 1;
+  background: rgba(34, 139, 34, 0.15);
+  border-color: rgba(34, 139, 34, 0.7);
+}
