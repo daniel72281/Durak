@@ -39,6 +39,12 @@ export function computeLegalMoves(state: ClientGameState): LegalMoves {
 
   const isDefender = state.selfIndex === state.defenderIndex;
   const isAttacker = state.selfIndex === state.attackerIndex;
+  const defenderHand = state.players[state.defenderIndex]?.handCount ?? 0;
+  // Same rule as the server: a defender who has declared take is treated
+  // as having unlimited capacity (they collect everything anyway).
+  const effectiveDefenderHand = state.defenderTaking
+    ? Number.POSITIVE_INFINITY
+    : defenderHand;
 
   // For transfer: new defender (next active player after current defender)
   const nextDefenderIdx = nextActiveIndex(state, state.defenderIndex);
@@ -81,7 +87,12 @@ export function computeLegalMoves(state: ClientGameState): LegalMoves {
         const blockedByPass = (state.defenderTaking || fullyDefended) && haveIPassed;
         if (
           !blockedByPass &&
-          canAttackCard(card, state.table, computeAttackLimit(state))
+          canAttackCard(
+            card,
+            state.table,
+            effectiveDefenderHand,
+            computeAttackLimit(state),
+          )
         ) {
           targets.push({ kind: 'attack' });
         }

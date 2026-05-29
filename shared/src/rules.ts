@@ -58,8 +58,11 @@ export function rankIsOnTable(card: Card, table: readonly TablePair[]): boolean 
 //   - Table empty: any card is a legal opening attack.
 //   - Otherwise:   card's rank must match some rank already on the table.
 //   - Total attacks must stay under `roundAttackLimit` (5 in round 1,
-//     6 in round 2+). Defender's hand size does NOT cap throw-ins —
-//     if they run out of cards they are forced to take.
+//     6 in round 2+).
+//   - **No attacks may be added to a defender with zero cards** —
+//     pass `Number.POSITIVE_INFINITY` for `defenderHandSize` when the
+//     defender has already declared 'take' (in that case they're
+//     collecting everything, so hand size doesn't matter).
 //
 // Note: this does not check WHO is playing the card. The caller (engine)
 // enforces that the opening attack comes from `attackerIndex` and that
@@ -67,9 +70,11 @@ export function rankIsOnTable(card: Card, table: readonly TablePair[]): boolean 
 export function canAttackCard(
   card: Card,
   table: readonly TablePair[],
+  defenderHandSize: number,
   roundAttackLimit: number,
 ): boolean {
   if (table.length >= roundAttackLimit) return false;
+  if (defenderHandSize <= 0) return false;
   if (table.length === 0) return true;
   return rankIsOnTable(card, table);
 }

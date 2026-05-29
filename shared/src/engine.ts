@@ -208,7 +208,16 @@ function handleAttack(
   const player = state.players[playerIdx]!;
   if (!hasCard(player.hand, action.card)) return fail('card not in hand');
 
-  if (!canAttackCard(action.card, state.table, state.roundAttackLimit)) {
+  // When the defender has declared take, they're collecting whatever's
+  // thrown on them — hand size becomes irrelevant. Otherwise we honour
+  // the "no attacks to a 0-card defender" rule from canAttackCard.
+  const defenderHand = state.players[state.defenderIndex]!.hand.length;
+  const effectiveDefenderHand = state.defenderTaking
+    ? Number.POSITIVE_INFINITY
+    : defenderHand;
+  if (
+    !canAttackCard(action.card, state.table, effectiveDefenderHand, state.roundAttackLimit)
+  ) {
     return fail('card is not a legal attack now');
   }
 

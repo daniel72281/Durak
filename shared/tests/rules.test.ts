@@ -119,32 +119,49 @@ describe('rankIsOnTable', () => {
 });
 
 describe('canAttackCard', () => {
-  it('opening attack: any card on empty table', () => {
-    expect(canAttackCard(c('6', 'hearts'), [], 5)).toBe(true);
+  it('opening attack: any card on empty table when defender has cards', () => {
+    expect(canAttackCard(c('6', 'hearts'), [], 6, 5)).toBe(true);
   });
 
   it('throw-in: must match a rank already on the table', () => {
     const table = [pair(c('7', 'spades'))];
-    expect(canAttackCard(c('7', 'hearts'), table, 5)).toBe(true);
-    expect(canAttackCard(c('8', 'hearts'), table, 5)).toBe(false);
+    expect(canAttackCard(c('7', 'hearts'), table, 6, 5)).toBe(true);
+    expect(canAttackCard(c('8', 'hearts'), table, 6, 5)).toBe(false);
   });
 
   it('rejects when table is at the round attack limit', () => {
     const table: TablePair[] = Array(5)
       .fill(null)
       .map(() => pair(c('7', 'spades'), c('K', 'spades')));
-    expect(canAttackCard(c('7', 'hearts'), table, 5)).toBe(false);
+    expect(canAttackCard(c('7', 'hearts'), table, 6, 5)).toBe(false);
   });
 
-  it('allows throw-in regardless of defender hand size (per user rule)', () => {
-    // 3 cards on the table, 2 defended. Defender hand size is no longer a
-    // factor — only the round attack limit caps throw-ins.
+  it('allows throw-in regardless of defender hand size (so long as > 0)', () => {
+    // 3 cards on the table, 2 defended. The total cap (round limit) is
+    // what caps throw-ins, not how many defended/undefended attacks there are.
     const table: TablePair[] = [
       pair(c('7', 'spades'), c('K', 'spades')),
       pair(c('7', 'clubs'), c('A', 'clubs')),
       pair(c('7', 'diamonds')),
     ];
-    expect(canAttackCard(c('7', 'hearts'), table, 6)).toBe(true);
+    expect(canAttackCard(c('7', 'hearts'), table, 2, 6)).toBe(true);
+  });
+
+  it('rejects any attack/throw-in when defender has zero cards (user rule)', () => {
+    // Opening attack to 0-card defender — blocked
+    expect(canAttackCard(c('6', 'hearts'), [], 0, 5)).toBe(false);
+    // Throw-in to 0-card defender — also blocked
+    const table = [pair(c('7', 'spades'), c('K', 'spades'))];
+    expect(canAttackCard(c('7', 'hearts'), table, 0, 6)).toBe(false);
+  });
+
+  it('still allows throw-ins to a 0-card defender who is taking (Infinity)', () => {
+    // When defender is taking, callers pass Infinity — the "0 cards" rule
+    // doesn't apply because the defender is collecting everything.
+    const table = [pair(c('7', 'spades'))];
+    expect(
+      canAttackCard(c('7', 'hearts'), table, Number.POSITIVE_INFINITY, 6),
+    ).toBe(true);
   });
 });
 
