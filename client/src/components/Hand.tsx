@@ -1,3 +1,4 @@
+import { AnimatePresence } from 'framer-motion';
 import type { Card, Suit } from '@shared/types';
 import { rankValue } from '@shared/rules';
 import DraggableCard from './DraggableCard';
@@ -56,19 +57,24 @@ function Hand({ cards, trumpSuit, legalMoves, sortMode, onCardClick }: Props) {
 
   return (
     <div className="hand">
-      {sorted.map((card) => {
-        const key = cardKey(card);
-        const isLegal = legalMoves.byCard.has(key);
-        return (
-          <DraggableCard
-            key={key}
-            card={card}
-            isTrump={card.suit === trumpSuit}
-            isLegal={isLegal}
-            onClick={() => onCardClick(card)}
-          />
-        );
-      })}
+      {/* AnimatePresence keeps unmounting cards alive long enough for
+          their layoutId animation to play out (e.g., when a card is
+          played to the table and re-mounts there). */}
+      <AnimatePresence>
+        {sorted.map((card) => {
+          const key = cardKey(card);
+          const isLegal = legalMoves.byCard.has(key);
+          return (
+            <DraggableCard
+              key={key}
+              card={card}
+              isTrump={card.suit === trumpSuit}
+              isLegal={isLegal}
+              onClick={() => onCardClick(card)}
+            />
+          );
+        })}
+      </AnimatePresence>
     </div>
   );
 }
