@@ -1,7 +1,7 @@
 import { useDraggable } from '@dnd-kit/core';
 import type { Card } from '@shared/types';
 import { cardKey } from '../utils/legalMoves';
-import TextCard from './TextCard';
+import CardSvg from './CardSvg';
 import './DraggableCard.css';
 
 interface Props {
@@ -36,7 +36,7 @@ function DraggableCard({ card, isTrump, isLegal, disabled, onClick }: Props) {
       {...listeners}
       onClick={onClick}
     >
-      <TextCard card={card} isTrump={isTrump} disabled={disabled} />
+      <CardSvg card={card} isTrump={isTrump} />
     </div>
   );
 }

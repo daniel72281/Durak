@@ -1,7 +1,7 @@
 import { useDroppable } from '@dnd-kit/core';
 import { useTranslation } from 'react-i18next';
 import type { Suit, TablePair } from '@shared/types';
-import TextCard from './TextCard';
+import CardSvg from './CardSvg';
 import './Table.css';
 
 interface Props {
@@ -32,11 +32,11 @@ function PairDroppable({
       className={`pair ${canDefend ? 'droppable' : ''} ${isOver ? 'drop-target-active' : ''}`}
     >
       <div className="attack-slot">
-        <TextCard card={pair.attack} isTrump={pair.attack.suit === trumpSuit} />
+        <CardSvg card={pair.attack} isTrump={pair.attack.suit === trumpSuit} />
       </div>
       {pair.defense && (
         <div className="defense-overlay">
-          <TextCard card={pair.defense} isTrump={pair.defense.suit === trumpSuit} />
+          <CardSvg card={pair.defense} isTrump={pair.defense.suit === trumpSuit} />
         </div>
       )}
     </div>

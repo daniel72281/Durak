@@ -15,7 +15,7 @@ import Table from './Table';
 import PlayerList from './PlayerList';
 import ActionButtons from './ActionButtons';
 import TurnTimer from './TurnTimer';
-import TextCard from './TextCard';
+import CardSvg from './CardSvg';
 import SortToggle from './SortToggle';
 import { computeLegalMoves, cardKey } from '../utils/legalMoves';
 import './GamePanel.css';
@@ -142,7 +142,7 @@ function GamePanel({ state, onAction, onShowError }: Props) {
           {state.trumpCard && (
             <span className="trump-pill">
               {t('game.trump_label')}
-              <TextCard card={state.trumpCard} isTrump variant="small" />
+              <CardSvg card={state.trumpCard} isTrump variant="small" />
             </span>
           )}
           <TurnTimer deadline={state.turnDeadline} />
