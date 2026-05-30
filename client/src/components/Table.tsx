@@ -1,12 +1,15 @@
 import { useDroppable } from '@dnd-kit/core';
 import { useTranslation } from 'react-i18next';
-import type { Suit, TablePair } from '@shared/types';
+import type { Card, Suit, TablePair } from '@shared/types';
 import CardSvg from './CardSvg';
+import DeckStack from './DeckStack';
 import './Table.css';
 
 interface Props {
   pairs: readonly TablePair[];
   trumpSuit: Suit;
+  deckCount: number;
+  trumpCard: Card | null;
   // Which drop targets to enable
   showAttackZone: boolean;
   showTransferZone: boolean;
@@ -66,16 +69,23 @@ function TransferZone() {
 function Table({
   pairs,
   trumpSuit,
+  deckCount,
+  trumpCard,
   showAttackZone,
   showTransferZone,
   defendablePairIndices,
 }: Props) {
   const defendableSet = new Set(defendablePairIndices);
   if (pairs.length === 0 && !showAttackZone) {
-    return <div className="table table-empty" aria-label="empty table" />;
+    return (
+      <div className="table table-empty" aria-label="empty table">
+        <DeckStack deckCount={deckCount} trumpCard={trumpCard} />
+      </div>
+    );
   }
   return (
     <div className="table">
+      <DeckStack deckCount={deckCount} trumpCard={trumpCard} />
       {pairs.map((pair, i) => (
         <PairDroppable
           key={i}

@@ -15,7 +15,6 @@ import Table from './Table';
 import PlayerList from './PlayerList';
 import ActionButtons from './ActionButtons';
 import TurnTimer from './TurnTimer';
-import CardSvg from './CardSvg';
 import SortToggle from './SortToggle';
 import { computeLegalMoves, cardKey } from '../utils/legalMoves';
 import './GamePanel.css';
@@ -138,13 +137,6 @@ function GamePanel({ state, onAction, onShowError }: Props) {
         />
 
         <div className="game-meta">
-          <span>{t('game.deck_count', { count: state.deckCount })}</span>
-          {state.trumpCard && (
-            <span className="trump-pill">
-              {t('game.trump_label')}
-              <CardSvg card={state.trumpCard} isTrump variant="small" />
-            </span>
-          )}
           <TurnTimer deadline={state.turnDeadline} />
         </div>
 
@@ -187,6 +179,8 @@ function GamePanel({ state, onAction, onShowError }: Props) {
         <Table
           pairs={state.table}
           trumpSuit={state.trumpSuit}
+          deckCount={state.deckCount}
+          trumpCard={state.trumpCard}
           showAttackZone={showAttackZone}
           showTransferZone={showTransferZone}
           defendablePairIndices={Array.from(defendablePairIndices)}
