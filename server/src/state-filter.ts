@@ -15,6 +15,7 @@ export function filterGameState(
   roomId: string,
   turnDeadline: number | null,
   scoreboard: ReadonlyMap<string, PlayerScore>,
+  disconnectedIds: ReadonlySet<string>,
 ): ClientGameState {
   const selfIndex = state.players.findIndex((p) => p.id === viewerPlayerId);
   // -1 selfIndex is unusual (caller should have validated) but we still build
@@ -25,6 +26,7 @@ export function filterGameState(
     nickname: p.nickname,
     handCount: p.hand.length,
     isOut: p.isOut,
+    disconnected: disconnectedIds.has(p.id),
   }));
   const trumpCard = state.deck.length > 0 ? state.deck[0]! : null;
   const scoreboardObj: { [playerId: string]: PlayerScore } = {};
@@ -49,6 +51,8 @@ export function filterGameState(
     turnDeadline,
     outOrder: [...state.outOrder],
     loser: state.loser,
+    endReason: state.endReason,
+    firstAttackerReason: state.firstAttackerReason,
     scoreboard: scoreboardObj,
   };
 }

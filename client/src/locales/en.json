@@ -52,7 +52,11 @@
     "duraks_count": "Duraks",
     "durak_short": "Durak",
     "play_again": "Play again",
-    "waiting_for_restart": "Waiting for the owner to start the next game…"
+    "waiting_for_restart": "Waiting for the owner to start the next game…",
+    "ended_player_disconnected": "Game ended — a player disconnected. This round doesn't count.",
+    "first_attacker_six_of_trumps": "{{nickname}} has the 6 of trumps — starts first",
+    "first_attacker_previous_winner": "{{nickname}} won the last game — starts first",
+    "first_attacker_random": "First attacker chosen at random"
   },
   "room": {
     "room_code": "Room code",

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { socket } from '../socket';
+import { saveSession } from '../lib/session';
 import './HomePage.css';
 
 function HomePage() {
@@ -27,6 +28,12 @@ function HomePage() {
         setError(ack.error);
         return;
       }
+      saveSession({
+        roomId: ack.roomId,
+        playerId: ack.playerId,
+        nickname: cleanNick,
+        isOwner: true,
+      });
       navigate(`/room/${ack.roomId}`, {
         state: { nickname: cleanNick, playerId: ack.playerId, isOwner: true },
       });
@@ -52,6 +59,12 @@ function HomePage() {
         setError(ack.error);
         return;
       }
+      saveSession({
+        roomId: cleanCode,
+        playerId: ack.playerId,
+        nickname: cleanNick,
+        isOwner: false,
+      });
       navigate(`/room/${cleanCode}`, {
         state: { nickname: cleanNick, playerId: ack.playerId, isOwner: false },
       });

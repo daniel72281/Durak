@@ -56,6 +56,13 @@ export interface GameState {
   // this list (set as `loser` once game ends).
   outOrder: string[];
   loser: string | null;     // player id of the durak once phase === 'finished'
+  // Why the game ended. 'normal' = standard durak finish; 'player_disconnected'
+  // = a player's reconnect-grace expired mid-game, so the round ends with no
+  // winner (loser stays null) and the scoreboard isn't updated.
+  endReason: 'normal' | 'player_disconnected' | null;
+  // Reason the first attacker was chosen. Used by the client to show a one-
+  // off banner at the start of each game. null after the first action.
+  firstAttackerReason: 'six_of_trumps' | 'random' | 'previous_winner' | null;
 }
 
 // Actions a player can send over the wire. (Game lifecycle actions like
@@ -74,6 +81,9 @@ export interface PublicPlayer {
   nickname: string;
   handCount: number;
   isOut: boolean;
+  // Transient flag while the socket is dropped but the player still has a
+  // chance to rejoin within the grace period.
+  disconnected: boolean;
 }
 
 export interface PlayerScore {
@@ -102,6 +112,8 @@ export interface ClientGameState {
   // Order players went out, 1st place first; durak is `loser` (not in list).
   outOrder: string[];
   loser: string | null;
+  endReason: 'normal' | 'player_disconnected' | null;
+  firstAttackerReason: 'six_of_trumps' | 'random' | 'previous_winner' | null;
   // Cumulative scoreboard across all games played in this room.
   scoreboard: { [playerId: string]: PlayerScore };
 }

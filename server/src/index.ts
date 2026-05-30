@@ -22,6 +22,10 @@ import {
 const PORT = Number(process.env.PORT) || 3002;
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
 
+// How long a player has to come back after a socket drop before we end the
+// game and remove them from the room. Confirmed by user as 60s on 2026-05-30.
+const RECONNECT_GRACE_MS = 60_000;
+
 const app = express();
 app.use(cors({ origin: CLIENT_ORIGIN }));
 
@@ -43,6 +47,7 @@ function broadcastRoomState(roomId: string): void {
   const room = rooms.getRoom(roomId);
   if (!room) return;
   for (const player of room.players) {
+    if (player.disconnected) continue; // their socket is gone; nothing to send
     const isOwner = player.id === room.ownerId;
     const payload: RoomStatePayload = {
       roomId: room.id,
@@ -58,6 +63,7 @@ function broadcastRoomState(roomId: string): void {
         nickname: p.nickname,
         handCount: 0,
         isOut: false,
+        disconnected: p.disconnected,
       }));
     }
     io.to(player.socketId).emit('room:state', payload);
@@ -78,7 +84,7 @@ function closeRoomWithReason(roomId: string, reason: RoomClosedReason): void {
     }
   }
   io.to(roomId).emit('room:closed', { reason });
-  rooms.closeRoom(roomId);
+  rooms.closeRoom(roomId); // also clears disconnect timers
 }
 
 // Updates the per-room scoreboard with the just-finished game's result.
@@ -87,6 +93,12 @@ function closeRoomWithReason(roomId: string, reason: RoomClosedReason): void {
 function commitScoreIfFinished(room: rooms.Room): void {
   if (!room.game || room.game.phase !== 'finished') return;
   if (room.scoredCurrentGame) return;
+  // Games that ended because a player disconnected don't count — the user
+  // asked that the scoreboard stay unchanged in that case.
+  if (room.game.endReason === 'player_disconnected') {
+    room.scoredCurrentGame = true;
+    return;
+  }
   const loserId = room.game.loser;
   for (const p of room.players) {
     const score = room.scoreboard.get(p.id) ?? { wins: 0, duraks: 0 };
@@ -100,13 +112,25 @@ function commitScoreIfFinished(room: rooms.Room): void {
 }
 
 // Sends each player in the room their personalised ClientGameState.
+// Skips players whose sockets are currently down — they'll get state on rejoin.
 function broadcastGameState(roomId: string): void {
   const room = rooms.getRoom(roomId);
   if (!room || !room.game) return;
   commitScoreIfFinished(room);
   const deadline = getTurnDeadline(roomId);
+  const disconnectedIds = new Set(
+    room.players.filter((p) => p.disconnected).map((p) => p.id),
+  );
   for (const player of room.players) {
-    const view = filterGameState(room.game, player.id, room.id, deadline, room.scoreboard);
+    if (player.disconnected) continue;
+    const view = filterGameState(
+      room.game,
+      player.id,
+      room.id,
+      deadline,
+      room.scoreboard,
+      disconnectedIds,
+    );
     io.to(player.socketId).emit('game:state', view);
   }
 }
@@ -162,19 +186,22 @@ io.on('connection', (socket) => {
   socket.on('room:leave', (_payload, ack) => {
     const playerId = socketToPlayer.get(socket.id);
     if (!playerId) return ack({ ok: false, error: 'not in a room' });
-    const result = rooms.leaveRoom(playerId);
-    socketToPlayer.delete(socket.id);
-    if (!result) return ack({ ok: false, error: 'not in a room' });
-    void socket.leave(result.roomId);
-    if (result.wasOwner) {
-      closeRoomWithReason(result.roomId, 'owner_left');
-    } else if (result.gameWasOn) {
-      closeRoomWithReason(result.roomId, 'player_left_mid_game');
-    } else if (result.remainingPlayers > 0) {
-      broadcastRoomState(result.roomId);
-    } else {
-      rooms.closeRoom(result.roomId);
+    const room = rooms.getRoomByPlayer(playerId);
+    if (!room) {
+      socketToPlayer.delete(socket.id);
+      return ack({ ok: false, error: 'not in a room' });
     }
+    socketToPlayer.delete(socket.id);
+    void socket.leave(room.id);
+    // Cancel any pending grace timer (intentional leave skips the wait).
+    const timer = room.disconnectTimers.get(playerId);
+    if (timer) {
+      clearTimeout(timer);
+      room.disconnectTimers.delete(playerId);
+    }
+    // Mark first so handleDisconnectExpiry treats this as a real departure.
+    rooms.markDisconnected(playerId);
+    handleDisconnectExpiry(room.id, playerId);
     ack({ ok: true });
   });
 
@@ -203,19 +230,26 @@ io.on('connection', (socket) => {
     }
     // Ensure final score from the just-finished game is committed before reset.
     commitScoreIfFinished(room);
+    // Pick the previous game's winner (first to empty their hand) as the
+    // starter — walk outOrder from front to back, picking the first one
+    // who's still in the room.
+    let startPlayerId: string | null = null;
+    for (const pid of room.game.outOrder) {
+      if (room.players.some((p) => p.id === pid)) { startPlayerId = pid; break; }
+    }
     try {
       const initial = createGame(
         room.players.map((p) => ({ id: p.id, nickname: p.nickname })),
       );
       const shuffled = shuffle(createDeck());
-      const result = startGame(initial, shuffled);
+      const result = startGame(initial, shuffled, { startPlayerId });
       if (!result.ok) return ack({ ok: false, error: result.error });
       room.game = result.state;
       room.scoredCurrentGame = false;
     } catch (e) {
       return ack({ ok: false, error: (e as Error).message });
     }
-    console.log(`[game:restart] room=${room.id} by ${playerId}`);
+    console.log(`[game:restart] room=${room.id} by ${playerId} startPlayerId=${startPlayerId ?? 'none'}`);
     startTurnTimer(room.id, () => handleTimerExpiry(room.id));
     ack({ ok: true });
     broadcastGameState(room.id);
@@ -281,20 +315,80 @@ io.on('connection', (socket) => {
     console.log(`[socket] disconnected: ${socket.id} (${reason})`);
     const playerId = socketToPlayer.get(socket.id);
     if (!playerId) return;
-    const result = rooms.leaveRoom(playerId);
     socketToPlayer.delete(socket.id);
-    if (!result) return;
-    if (result.wasOwner) {
-      closeRoomWithReason(result.roomId, 'owner_left');
-    } else if (result.gameWasOn) {
-      closeRoomWithReason(result.roomId, 'player_left_mid_game');
-    } else if (result.remainingPlayers > 0) {
-      broadcastRoomState(result.roomId);
-    } else {
-      rooms.closeRoom(result.roomId);
+    const room = rooms.markDisconnected(playerId);
+    if (!room) return;
+    // Schedule eviction after the grace period. The handler is a no-op if
+    // the player rejoined in the meantime (markReconnected clears the timer).
+    const timer = setTimeout(() => {
+      handleDisconnectExpiry(room.id, playerId);
+    }, RECONNECT_GRACE_MS);
+    room.disconnectTimers.set(playerId, timer);
+    // Let the rest of the room know the seat is dimmed (room state for the
+    // waiting-room case; game state during a live game).
+    if (room.game) broadcastGameState(room.id);
+    else broadcastRoomState(room.id);
+  });
+
+  socket.on('room:rejoin', ({ roomId, playerId }, ack) => {
+    const room = rooms.getRoom(roomId);
+    if (!room) return ack({ ok: false, error: 'room not found' });
+    const player = room.players.find((p) => p.id === playerId);
+    if (!player) return ack({ ok: false, error: 'no such session in room' });
+    // Drop any prior socket→player mapping for this player (their old socket
+    // is gone anyway; the new one is `socket.id`).
+    for (const [sid, pid] of socketToPlayer.entries()) {
+      if (pid === playerId) socketToPlayer.delete(sid);
     }
+    rooms.markReconnected(playerId, socket.id);
+    socketToPlayer.set(socket.id, playerId);
+    void socket.join(roomId);
+    console.log(`[room:rejoin] room=${roomId} player=${playerId} socket=${socket.id}`);
+    ack({ ok: true });
+    broadcastRoomState(roomId);
+    if (room.game) broadcastGameState(roomId);
   });
 });
+
+// Called when a disconnect grace timer fires. Either evicts the player and
+// continues (if the room can survive without them) or closes the room.
+function handleDisconnectExpiry(roomId: string, playerId: string): void {
+  const room = rooms.getRoom(roomId);
+  if (!room) return;
+  const player = room.players.find((p) => p.id === playerId);
+  if (!player || !player.disconnected) return; // they came back, nothing to do
+  console.log(`[disconnect-expiry] room=${roomId} player=${playerId}`);
+
+  if (player.id === room.ownerId) {
+    closeRoomWithReason(roomId, 'owner_left');
+    return;
+  }
+
+  // Non-owner left during a live game → end this game without a winner,
+  // remove the player + their scoreboard entry, broadcast the final state.
+  if (room.game && room.game.phase === 'playing') {
+    room.game = {
+      ...room.game,
+      phase: 'finished',
+      loser: null,
+      endReason: 'player_disconnected',
+    };
+    clearTurnTimer(roomId);
+    room.scoredCurrentGame = true; // explicit: don't update wins/duraks
+  }
+
+  const result = rooms.evictPlayer(playerId);
+  if (!result) return;
+
+  // If we have at least 2 players still here, keep the room open so the
+  // owner can start a new round. Otherwise tear it down.
+  if (result.remainingPlayers >= 2) {
+    broadcastRoomState(roomId);
+    if (room.game) broadcastGameState(roomId);
+  } else {
+    closeRoomWithReason(roomId, 'player_left_mid_game');
+  }
+}
 
 httpServer.listen(PORT, () => {
   console.log(`[server] listening on http://localhost:${PORT}`);

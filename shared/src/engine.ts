@@ -22,7 +22,6 @@ import {
   computeRoundAttackLimit,
   findDurak,
   nextActivePlayerIndex,
-  rankValue,
   tableIsFullyDefended,
 } from './rules';
 import { dealInitial, drawFromTop } from './deck';
@@ -75,10 +74,24 @@ export function createGame(
     defenderTaking: false,
     outOrder: [],
     loser: null,
+    endReason: null,
+    firstAttackerReason: null,
   };
 }
 
-export function startGame(state: GameState, shuffledDeck: readonly Card[]): EngineResult {
+export interface StartGameOptions {
+  // Set on game:restart — the previous game's winner (first player to empty
+  // their hand). If they're still in the room, they open the new game.
+  startPlayerId?: string | null;
+  // Injectable RNG for tests; defaults to Math.random.
+  random?: () => number;
+}
+
+export function startGame(
+  state: GameState,
+  shuffledDeck: readonly Card[],
+  options?: StartGameOptions,
+): EngineResult {
   if (state.phase !== 'waiting') {
     return fail('game already started');
   }
@@ -92,7 +105,8 @@ export function startGame(state: GameState, shuffledDeck: readonly Card[]): Engi
     ...p,
     hand: [...deal.hands[i]!],
   }));
-  const attackerIndex = findFirstAttacker(players, deal.trumpSuit);
+  const pick = findFirstAttackerForNewGame(players, deal.trumpSuit, options);
+  const attackerIndex = pick.index;
   const defenderIndex = nextActivePlayerIndex(players, attackerIndex);
   const roundAttackLimit = computeRoundAttackLimit(1);
   return ok({
@@ -107,27 +121,39 @@ export function startGame(state: GameState, shuffledDeck: readonly Card[]): Engi
     roundAttackLimit,
     passedPlayerIds: [],
     defenderTaking: false,
+    endReason: null,
+    firstAttackerReason: pick.reason,
   });
 }
 
-// Standard rule: player with the lowest trump card opens. If nobody holds a
-// trump, the first seat opens (rare with a 36-card deck and ≥2 players).
-function findFirstAttacker(players: readonly Player[], trumpSuit: Suit): number {
-  let bestIdx = 0;
-  let bestValue: number | null = null;
+// Pick the first attacker for a new game and explain why. Three rules in
+// priority order:
+//   1. If options.startPlayerId is given and matches a current player → they
+//      open. Used on game:restart (= the previous game's winner, the first
+//      player to empty their hand).
+//   2. Otherwise look for the 6 of trumps in any player's hand → they open.
+//      Used for the first game in a room.
+//   3. Otherwise pick a random player → fallback when the 6 of trumps is
+//      face-up under the deck or buried in the draw pile.
+export function findFirstAttackerForNewGame(
+  players: readonly Player[],
+  trumpSuit: Suit,
+  options?: StartGameOptions,
+): { index: number; reason: 'six_of_trumps' | 'random' | 'previous_winner' } {
+  if (options?.startPlayerId) {
+    const idx = players.findIndex((p) => p.id === options.startPlayerId);
+    if (idx >= 0) return { index: idx, reason: 'previous_winner' };
+  }
   for (let i = 0; i < players.length; i++) {
-    const trumps = players[i]!.hand.filter((c) => c.suit === trumpSuit);
-    if (trumps.length === 0) continue;
-    const minTrump = trumps.reduce((min, c) =>
-      rankValue(c.rank) < rankValue(min.rank) ? c : min,
-    );
-    const v = rankValue(minTrump.rank);
-    if (bestValue === null || v < bestValue) {
-      bestValue = v;
-      bestIdx = i;
+    if (players[i]!.hand.some((c) => c.rank === '6' && c.suit === trumpSuit)) {
+      return { index: i, reason: 'six_of_trumps' };
     }
   }
-  return bestIdx;
+  const rng = options?.random ?? Math.random;
+  return {
+    index: Math.floor(rng() * players.length),
+    reason: 'random',
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -179,10 +205,11 @@ function checkMidActionGameEnd(state: GameState): GameState {
       outOrder: newOutOrder,
       phase: 'finished',
       loser: withCards[0]!.id,
+      endReason: 'normal',
     };
   }
   if (withCards.length === 0) {
-    return { ...state, players, outOrder: newOutOrder, phase: 'finished', loser: null };
+    return { ...state, players, outOrder: newOutOrder, phase: 'finished', loser: null, endReason: 'normal' };
   }
   return { ...state, players, outOrder: newOutOrder };
 }
@@ -420,6 +447,7 @@ function completeRound(state: GameState): GameState {
       outOrder: newOutOrder,
       phase: 'finished',
       loser: durakId,
+      endReason: 'normal',
     };
   }
   // Also check the "everyone empty" draw case — phase 'finished', loser null.
@@ -436,6 +464,7 @@ function completeRound(state: GameState): GameState {
       outOrder: newOutOrder,
       phase: 'finished',
       loser: null,
+      endReason: 'normal',
     };
   }
 

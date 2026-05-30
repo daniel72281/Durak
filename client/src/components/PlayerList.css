@@ -30,6 +30,15 @@
   text-decoration: line-through;
 }
 
+.player-row.disconnected {
+  opacity: 0.5;
+  font-style: italic;
+}
+
+.disconnect-badge {
+  font-size: 14px;
+}
+
 .role-icon {
   font-size: 14px;
   min-width: 14px;

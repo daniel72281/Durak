@@ -52,7 +52,11 @@
     "duraks_count": "פעמים דוראק",
     "durak_short": "דוראק",
     "play_again": "סיבוב נוסף",
-    "waiting_for_restart": "ממתינים שבעל החדר יתחיל סיבוב חדש…"
+    "waiting_for_restart": "ממתינים שבעל החדר יתחיל סיבוב חדש…",
+    "ended_player_disconnected": "המשחק הסתיים — שחקן התנתק. הסיבוב הזה לא נספר.",
+    "first_attacker_six_of_trumps": "ל-{{nickname}} יש 6 קוזר — מתחיל ראשון",
+    "first_attacker_previous_winner": "{{nickname}} ניצח את המשחק הקודם — מתחיל ראשון",
+    "first_attacker_random": "התוקף הראשון נבחר אקראית"
   },
   "room": {
     "room_code": "קוד חדר",

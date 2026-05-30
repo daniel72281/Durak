@@ -32,6 +32,13 @@ export interface RoomJoinAck {
   playerId: string;
 }
 
+// Rejoin: client comes back from a transient disconnect (or page reload).
+// Identifies itself with the playerId saved in localStorage from create/join.
+export interface RoomRejoinPayload {
+  roomId: string;
+  playerId: string;
+}
+
 // --- Server → Client payloads
 export interface RoomStatePayload {
   roomId: string;
@@ -71,6 +78,10 @@ export interface ClientToServerEvents {
   ) => void;
   'room:leave': (
     payload: Record<string, never>,
+    ack: (r: AckResult) => void,
+  ) => void;
+  'room:rejoin': (
+    payload: RoomRejoinPayload,
     ack: (r: AckResult) => void,
   ) => void;
   'room:close': (

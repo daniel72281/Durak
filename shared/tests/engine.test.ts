@@ -3,6 +3,7 @@ import {
   createGame,
   startGame,
   applyAction,
+  findFirstAttackerForNewGame,
   type EngineSuccess,
   type EngineResult,
 } from '../src/engine';
@@ -36,6 +37,8 @@ function makeState(overrides: Partial<GameState> = {}): GameState {
     defenderTaking: false,
     outOrder: [],
     loser: null,
+    endReason: null,
+    firstAttackerReason: null,
   };
   return { ...base, ...overrides };
 }
@@ -115,33 +118,66 @@ describe('startGame', () => {
     expect(result.trumpSuit).toBe(result.deck[0]!.suit);
   });
 
-  it('first attacker holds the lowest trump card', () => {
+  it('first attacker holds the 6 of trumps when someone has it', () => {
     const state = createGame([
       { id: 'a', nickname: 'A' },
       { id: 'b', nickname: 'B' },
     ]);
-    // Use a real seeded shuffle and verify the picked attacker has the lowest trump.
-    const shuffled = shuffle(createDeck(), seededRng(42));
-    const result = unwrap(startGame(state, shuffled));
-    const trump = result.trumpSuit;
-    const attackerTrumps = result.players[result.attackerIndex]!.hand.filter(
-      (c) => c.suit === trump,
-    );
-    expect(attackerTrumps.length).toBeGreaterThan(0);
-    const myMin = Math.min(...attackerTrumps.map((c) => '6789'.indexOf(c.rank.charAt(0))));
-    // Just check: no other player has a strictly lower trump.
-    const ranks = ['6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'] as const;
-    const minVal = (cards: Card[]) => {
-      const ts = cards.filter((c) => c.suit === trump);
-      if (ts.length === 0) return Infinity;
-      return Math.min(...ts.map((c) => ranks.indexOf(c.rank)));
-    };
-    const attackerMin = minVal(result.players[result.attackerIndex]!.hand);
-    for (let i = 0; i < result.players.length; i++) {
-      if (i === result.attackerIndex) continue;
-      expect(attackerMin).toBeLessThanOrEqual(minVal(result.players[i]!.hand));
+    // Try several seeds — most will produce a deal where one player holds
+    // the 6 of trumps. If so, that player must be the first attacker.
+    for (let seed = 1; seed < 30; seed++) {
+      const shuffled = shuffle(createDeck(), seededRng(seed));
+      const result = unwrap(startGame(state, shuffled));
+      const trump = result.trumpSuit;
+      const holder = result.players.findIndex((p) =>
+        p.hand.some((c) => c.rank === '6' && c.suit === trump),
+      );
+      if (holder >= 0) {
+        expect(result.attackerIndex).toBe(holder);
+        expect(result.firstAttackerReason).toBe('six_of_trumps');
+        return; // one demonstration is enough
+      }
     }
-    expect(typeof myMin).toBe('number'); // keep TS happy
+    throw new Error('no seed in 1..30 produced a 6-of-trumps deal');
+  });
+
+  it('records firstAttackerReason=random when no player has the 6 of trumps', () => {
+    // Hand-craft a state where no player holds the 6 of trumps — easy here
+    // because we bypass the deck and call findFirstAttackerForNewGame directly.
+    const players: Player[] = [
+      player('a', [card('K', 'hearts'), card('A', 'spades')]),
+      player('b', [card('Q', 'hearts'), card('J', 'clubs')]),
+    ];
+    // Use injected RNG → deterministic "random" pick.
+    const pick = findFirstAttackerForNewGame(players, 'hearts', {
+      random: () => 0.9, // → Math.floor(0.9 * 2) = 1 → player b
+    });
+    expect(pick.reason).toBe('random');
+    expect(pick.index).toBe(1);
+  });
+
+  it('honours startPlayerId (previous_winner) when provided', () => {
+    const players: Player[] = [
+      player('a', [card('6', 'hearts')]), // would normally win on six_of_trumps
+      player('b', [card('K', 'hearts')]),
+    ];
+    const pick = findFirstAttackerForNewGame(players, 'hearts', {
+      startPlayerId: 'b',
+    });
+    expect(pick.reason).toBe('previous_winner');
+    expect(pick.index).toBe(1);
+  });
+
+  it('falls back to six_of_trumps when startPlayerId is unknown', () => {
+    const players: Player[] = [
+      player('a', [card('K', 'hearts')]),
+      player('b', [card('6', 'hearts')]),
+    ];
+    const pick = findFirstAttackerForNewGame(players, 'hearts', {
+      startPlayerId: 'missing-id',
+    });
+    expect(pick.reason).toBe('six_of_trumps');
+    expect(pick.index).toBe(1);
   });
 
   it('rejects starting an already-started game', () => {

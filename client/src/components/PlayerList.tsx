@@ -27,7 +27,10 @@ function PlayerList({
         const isDefender = i === defenderIndex;
         const hasPassed = passedSet.has(p.id);
         return (
-          <li key={p.id} className={`player-row ${isSelf ? 'self' : ''} ${p.isOut ? 'out' : ''}`}>
+          <li
+            key={p.id}
+            className={`player-row ${isSelf ? 'self' : ''} ${p.isOut ? 'out' : ''} ${p.disconnected ? 'disconnected' : ''}`}
+          >
             <span className="role-icon" aria-hidden="true">
               {isAttacker && '✦'}
               {isDefender && (defenderTaking ? '🫳' : '🛡')}
@@ -35,6 +38,7 @@ function PlayerList({
             <span className="player-name">{p.nickname}{isSelf && ' (you)'}</span>
             <span className="hand-count">🂠 {p.handCount}</span>
             {hasPassed && <span className="pass-badge">passed</span>}
+            {p.disconnected && <span className="disconnect-badge" aria-label="disconnected">🔌</span>}
             {p.isOut && <span className="out-badge">out</span>}
           </li>
         );

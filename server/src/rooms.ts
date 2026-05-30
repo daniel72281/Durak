@@ -10,6 +10,11 @@ interface RoomPlayer {
   id: string;
   nickname: string;
   socketId: string;
+  // Transient drop — the socket is gone but the player may still rejoin
+  // within the grace period. While true, other players see the name dimmed
+  // and the turn doesn't advance past actions that need this player.
+  disconnected: boolean;
+  disconnectedAt: number | null; // epoch ms
 }
 
 export interface Room {
@@ -23,6 +28,9 @@ export interface Room {
   // Tracks whether the most recently finished game has already been scored
   // (to avoid double-counting if multiple events touch the same final state).
   scoredCurrentGame: boolean;
+  // Per-player timers that fire when a disconnect grace period expires.
+  // Cleared if the player rejoins, or when the room itself closes.
+  disconnectTimers: Map<string, NodeJS.Timeout>;
 }
 
 const rooms = new Map<string, Room>();
@@ -71,10 +79,17 @@ export function createRoom(
     id: roomId,
     ownerId: playerId,
     maxPlayers,
-    players: [{ id: playerId, nickname: clean, socketId }],
+    players: [{
+      id: playerId,
+      nickname: clean,
+      socketId,
+      disconnected: false,
+      disconnectedAt: null,
+    }],
     game: null,
     scoreboard: new Map([[playerId, { wins: 0, duraks: 0 }]]),
     scoredCurrentGame: false,
+    disconnectTimers: new Map(),
   });
   playerToRoom.set(playerId, roomId);
   return { ok: true, roomId, playerId };
@@ -103,7 +118,13 @@ export function joinRoom(
     return { ok: false, error: 'nickname already taken in this room' };
   }
   const playerId = generatePlayerId();
-  room.players.push({ id: playerId, nickname: clean, socketId });
+  room.players.push({
+    id: playerId,
+    nickname: clean,
+    socketId,
+    disconnected: false,
+    disconnectedAt: null,
+  });
   room.scoreboard.set(playerId, { wins: 0, duraks: 0 });
   playerToRoom.set(playerId, roomId);
   return { ok: true, playerId, roomId };
@@ -134,6 +155,9 @@ export function leaveRoom(playerId: string): LeaveResult | null {
 export function closeRoom(roomId: string): void {
   const room = rooms.get(roomId);
   if (!room) return;
+  // Cancel any pending disconnect grace timers so they don't fire after teardown.
+  for (const t of room.disconnectTimers.values()) clearTimeout(t);
+  room.disconnectTimers.clear();
   for (const player of room.players) {
     playerToRoom.delete(player.id);
   }
@@ -147,4 +171,55 @@ export function getRoom(roomId: string): Room | undefined {
 export function getRoomByPlayer(playerId: string): Room | undefined {
   const roomId = playerToRoom.get(playerId);
   return roomId ? rooms.get(roomId) : undefined;
+}
+
+// Mark a player as disconnected without removing them from the room — they
+// still occupy their seat and may rejoin within the grace period. Returns the
+// room so the caller can broadcast updated state, or null if no such room.
+export function markDisconnected(playerId: string): Room | null {
+  const room = getRoomByPlayer(playerId);
+  if (!room) return null;
+  const player = room.players.find((p) => p.id === playerId);
+  if (!player) return null;
+  player.disconnected = true;
+  player.disconnectedAt = Date.now();
+  return room;
+}
+
+// Reverse of markDisconnected. Updates the socketId so future broadcasts
+// reach the new connection, and clears any pending grace timer.
+export function markReconnected(
+  playerId: string,
+  newSocketId: string,
+): Room | null {
+  const room = getRoomByPlayer(playerId);
+  if (!room) return null;
+  const player = room.players.find((p) => p.id === playerId);
+  if (!player) return null;
+  player.disconnected = false;
+  player.disconnectedAt = null;
+  player.socketId = newSocketId;
+  const timer = room.disconnectTimers.get(playerId);
+  if (timer) {
+    clearTimeout(timer);
+    room.disconnectTimers.delete(playerId);
+  }
+  return room;
+}
+
+// Permanently remove a player from a room (called when grace expires).
+// Also clears their entry from the scoreboard so they no longer appear in
+// the cumulative rankings shown to the remaining players.
+export function evictPlayer(playerId: string): { room: Room; remainingPlayers: number } | null {
+  const room = getRoomByPlayer(playerId);
+  if (!room) return null;
+  room.players = room.players.filter((p) => p.id !== playerId);
+  room.scoreboard.delete(playerId);
+  const timer = room.disconnectTimers.get(playerId);
+  if (timer) {
+    clearTimeout(timer);
+    room.disconnectTimers.delete(playerId);
+  }
+  playerToRoom.delete(playerId);
+  return { room, remainingPlayers: room.players.length };
 }

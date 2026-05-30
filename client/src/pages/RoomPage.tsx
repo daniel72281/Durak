@@ -14,6 +14,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import GamePanel from '../components/GamePanel';
 import GameOverDialog from '../components/GameOverDialog';
 import Toast from '../components/Toast';
+import { clearSession, loadSession } from '../lib/session';
 import './RoomPage.css';
 
 interface NavState {
@@ -27,7 +28,21 @@ function RoomPage() {
   const { roomId } = useParams<{ roomId: string }>();
   const location = useLocation();
   const navigate = useNavigate();
-  const navState = (location.state ?? null) as NavState | null;
+  const navStateFromRouter = (location.state ?? null) as NavState | null;
+  // Fall back to localStorage if navState is missing (e.g. user refreshed
+  // the page or came back to a tab whose router state was lost).
+  const navState: NavState | null = (() => {
+    if (navStateFromRouter?.playerId) return navStateFromRouter;
+    const saved = loadSession();
+    if (saved && saved.roomId === roomId) {
+      return {
+        nickname: saved.nickname,
+        playerId: saved.playerId,
+        isOwner: saved.isOwner,
+      };
+    }
+    return navStateFromRouter;
+  })();
 
   const [roomState, setRoomState] = useState<RoomStatePayload | null>(() => {
     const cached = getLatestRoomState();
@@ -59,7 +74,10 @@ function RoomPage() {
     const onGameState = (s: ClientGameState) => {
       if (s.roomId === roomId) setGameState(s);
     };
-    const onClosed = (p: { reason: RoomClosedReason }) => setClosedReason(p.reason);
+    const onClosed = (p: { reason: RoomClosedReason }) => {
+      clearSession();
+      setClosedReason(p.reason);
+    };
     socket.on('room:state', onRoomState);
     socket.on('game:state', onGameState);
     socket.on('room:closed', onClosed);
@@ -82,10 +100,61 @@ function RoomPage() {
 
   useEffect(() => () => clearRoomCache(), []);
 
+  // Show a one-off toast at the start of each game explaining who's the
+  // first attacker and why (6 of trumps / previous winner / random).
+  // Keyed by a counter that increments every time we see a fresh playing
+  // phase + firstAttackerReason combination, so restarts also trigger it.
+  const lastShownReasonRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!gameState || gameState.phase !== 'playing') {
+      lastShownReasonRef.current = null;
+      return;
+    }
+    const reason = gameState.firstAttackerReason;
+    if (!reason) return;
+    // Use a composite key (reason + attackerIndex + first player id) so the
+    // toast appears once per game start, not once per state update.
+    const key = `${reason}:${gameState.attackerIndex}:${gameState.players[gameState.attackerIndex]?.id ?? ''}`;
+    if (lastShownReasonRef.current === key) return;
+    lastShownReasonRef.current = key;
+    const nickname = gameState.players[gameState.attackerIndex]?.nickname ?? '?';
+    if (reason === 'six_of_trumps') {
+      setToastMessage(t('game.first_attacker_six_of_trumps', { nickname }));
+    } else if (reason === 'previous_winner') {
+      setToastMessage(t('game.first_attacker_previous_winner', { nickname }));
+    } else {
+      setToastMessage(t('game.first_attacker_random'));
+    }
+  }, [gameState, t]);
+
+  // On every (re)connect, try to rejoin the room using saved credentials.
+  // This handles transient socket drops AND tab refreshes — the server
+  // remembers our seat for up to 60s (grace period).
+  useEffect(() => {
+    const tryRejoin = () => {
+      const saved = loadSession();
+      if (!saved || saved.roomId !== roomId) return;
+      socket.emit('room:rejoin', { roomId: saved.roomId, playerId: saved.playerId }, (ack) => {
+        if (!ack.ok) {
+          // The session is stale (grace expired or room closed). Wipe and
+          // bounce home.
+          clearSession();
+          navigate('/', { replace: true });
+        }
+      });
+    };
+    if (socket.connected) tryRejoin();
+    socket.on('connect', tryRejoin);
+    return () => {
+      socket.off('connect', tryRejoin);
+    };
+  }, [roomId, navigate]);
+
   const goHome = () => navigate('/', { replace: true });
 
   const confirmLeave = () => {
     socket.emit('room:leave', {}, () => {
+      clearSession();
       setShowLeave(false);
       goHome();
     });
@@ -93,6 +162,7 @@ function RoomPage() {
 
   const confirmClose = () => {
     socket.emit('room:close', {}, () => {
+      clearSession();
       setShowClose(false);
       goHome();
     });
@@ -183,7 +253,10 @@ function RoomPage() {
               });
             }}
             onBackHome={() => {
-              socket.emit('room:leave', {}, () => goHome());
+              socket.emit('room:leave', {}, () => {
+                clearSession();
+                goHome();
+              });
             }}
           />
         )}

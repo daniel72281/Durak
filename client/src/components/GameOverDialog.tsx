@@ -33,7 +33,9 @@ function GameOverDialog({ state, isOwner, onPlayAgain, onBackHome }: Props) {
       <div className="game-over-dialog">
         <h2>{t('game.game_over')}</h2>
 
-        {state.loser ? (
+        {state.endReason === 'player_disconnected' ? (
+          <p className="game-over-result">{t('game.ended_player_disconnected')}</p>
+        ) : state.loser ? (
           <p className="game-over-result">
             {state.loser === myId
               ? t('game.you_are_durak')
@@ -46,7 +48,7 @@ function GameOverDialog({ state, isOwner, onPlayAgain, onBackHome }: Props) {
           <p className="game-over-result">{t('game.draw')}</p>
         )}
 
-        {ranking.length > 0 && (
+        {state.endReason !== 'player_disconnected' && ranking.length > 0 && (
           <section className="ranking">
             <h3>{t('game.this_game_ranking')}</h3>
             <ol className="ranking-list">
