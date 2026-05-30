@@ -1,58 +1,29 @@
-/* SVG playing card. Sized via CSS so the same component can render at
-   different sizes (hand, table, trump pill, etc.) while the SVG viewBox
-   keeps the layout proportional. */
+/* SVG playing card. The actual artwork comes from the David Bellot /
+   Huub de Beer sprite at /cards/svg-cards.svg (LGPL). We just size the
+   <svg> wrapper here; the viewBox keeps the card proportional. */
 
 .card-svg {
   display: inline-block;
   width: 60px;
-  height: 84px;
-  /* Force LTR so the corner indices stay top-left + bottom-right regardless
-     of UI direction (matches real playing cards). */
+  height: 87px;
   direction: ltr;
   vertical-align: top;
   user-select: none;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.15));
-  transition: transform 0.12s ease, filter 0.12s ease;
+  transition: filter 0.12s ease;
 }
 
 .card-svg.small {
   width: 40px;
-  height: 56px;
+  height: 58px;
 }
 
-.card-svg .card-body {
-  fill: #ffffff;
-  stroke: #c9c9c9;
-  stroke-width: 1;
-}
-
-.card-svg.trump .card-body {
+.card-svg .trump-frame {
+  fill: none;
   stroke: var(--accent, #7c3aed);
-  stroke-width: 1.5;
-  fill: #fbf8ff;
+  stroke-width: 6;
 }
 
-.card-svg.red text {
-  fill: #c0392b;
-}
-
-.card-svg.black text {
-  fill: #1a1a1a;
-}
-
-.card-svg .corner-index text,
-.card-svg .pip,
-.card-svg .center-suit,
-.card-svg .face-letter {
-  font-family: var(--mono, ui-sans-serif), sans-serif;
-}
-
-.card-svg .face-letter {
-  font-family: 'Georgia', 'Times New Roman', serif;
-}
-
-/* Subtle lift when hovered (the .draggable-card-wrap.legal class
-   handles the legal-card lift separately). */
 .card-svg:hover {
   filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.2));
 }
