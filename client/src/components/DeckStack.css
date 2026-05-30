@@ -5,7 +5,7 @@
    together on every viewport. */
 .deck-stack {
   /* Single width token; everything else derives from it. */
-  --deck-w: clamp(78px, 13vw, 96px);
+  --deck-w: clamp(64px, 13vw, 96px);
   --deck-h: calc(var(--deck-w) * 1.45); /* 167:242 ≈ 1:1.449 */
   --peek: calc(var(--deck-w) * 0.44);   /* width of trump strip showing on the left */
 
@@ -17,6 +17,19 @@
   height: calc(var(--deck-h) + 10px);
   pointer-events: none;
   z-index: 3;
+}
+
+/* On phone-sized viewports the deck stops being a corner ornament and
+   becomes a regular flex child of .table — otherwise it overlaps with
+   the first pair and forces every pair onto its own row. Pairing this
+   with the matching `padding: 14px` override on .table in Table.css. */
+@media (max-width: 600px) {
+  .deck-stack {
+    position: relative;
+    top: 0;
+    left: 0;
+    flex-shrink: 0;
+  }
 }
 
 /* ----- Trump under the pile ---------------------------------------- */

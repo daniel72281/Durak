@@ -8,6 +8,7 @@
      pair drops; bigger left padding reserves a "lane" for the deck. */
   min-height: clamp(220px, 32vh, 320px);
   padding: 28px 28px 28px clamp(150px, 22vw, 188px);
+  position: relative;
   /* Vignette: brighter at the top-center (where light would fall),
      fading to darker emerald at the edges. */
   background: radial-gradient(
@@ -30,13 +31,16 @@
 }
 
 /* Brand watermark on the empty felt. Almost invisible — just darker
-   than the felt — so it reads like an embossed casino logo, not text. */
-.table-empty {
-  justify-content: center;
-}
-
+   than the felt — so it reads like an embossed casino logo, not text.
+   Absolutely positioned across the whole felt so the centring isn't
+   thrown off by the left-padded "deck lane" used on desktop. */
 .table-empty::before {
   content: 'DURAK';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-family: Georgia, 'Times New Roman', serif;
   font-size: clamp(36px, 8vw, 64px);
   font-weight: 700;
@@ -130,4 +134,18 @@
   color: #fff;
   opacity: 1;
   box-shadow: 0 0 16px rgba(170, 59, 255, 0.5);
+}
+
+/* Phone-sized viewports: the absolute-positioned deck pile in the top-
+   left corner eats too much of a narrow felt and forces every pair onto
+   its own row. Switch to a normal flex flow where the deck is the
+   first child taking its natural width, and drop the reserved "deck
+   lane" padding so multiple pairs share a row. The matching
+   `position: relative` override on .deck-stack lives in DeckStack.css. */
+@media (max-width: 600px) {
+  .table {
+    padding: 14px;
+    gap: 12px;
+    min-height: clamp(200px, 50vh, 360px);
+  }
 }
