@@ -22,10 +22,10 @@
 .pair {
   position: relative;
   display: inline-block;
-  /* Sized to fit a card (clamp 64–96px wide) plus room for the diagonal
-     defense overlay (~25% offset). Grows/shrinks with viewport. */
-  width: clamp(86px, 17vw, 126px);
-  height: clamp(124px, 25vw, 180px);
+  /* Sized to fit a card (clamp 68–100px wide) plus room for the diagonal
+     defense overlay (~18% offset). Grows/shrinks with viewport. */
+  width: clamp(84px, 15vw, 118px);
+  height: clamp(122px, 22vw, 170px);
 }
 
 .pair .attack-slot {
@@ -35,11 +35,14 @@
 }
 
 .pair .defense-overlay {
-  /* Offset diagonally — uses % of the .pair so it scales with the card. */
+  /* Offset diagonally — uses % of the .pair so it scales with the card.
+     A directional drop-shadow makes the defense card visibly "lifted"
+     on top of the attack, instead of looking flush-glued. */
   position: absolute;
   top: 18%;
   left: 18%;
   z-index: 2;
+  filter: drop-shadow(-2px 3px 4px rgba(0, 0, 0, 0.4));
 }
 
 .pair.droppable {
@@ -58,7 +61,7 @@
   align-items: center;
   justify-content: center;
   min-width: 90px;
-  height: clamp(110px, 21vw, 150px);
+  height: clamp(108px, 19vw, 146px);
   padding: 8px;
   border: 2px dashed rgba(170, 59, 255, 0.4);
   border-radius: 6px;
@@ -81,7 +84,7 @@
   align-items: center;
   justify-content: center;
   min-width: 90px;
-  height: clamp(110px, 21vw, 150px);
+  height: clamp(108px, 19vw, 146px);
   padding: 8px;
   border: 2px dashed rgba(34, 139, 34, 0.3);
   border-radius: 6px;

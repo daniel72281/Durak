@@ -3,18 +3,22 @@
 
 .card-svg {
   display: inline-block;
-  /* Default desktop: large enough that pip indices and face artwork
-     read clearly. Scales down responsively on narrow viewports so a
-     6-card hand still fits without horizontal scroll. */
-  width: clamp(72px, 14vw, 108px);
+  /* Sized large enough that thin corner pip/rank indices read clearly,
+     while still letting a 6-card hand sit alongside the table on
+     narrower screens. */
+  width: clamp(68px, 13vw, 100px);
   /* Card aspect ratio in source SVGs: 167.087 : 242.667 ≈ 0.689. */
   aspect-ratio: 167 / 242;
   direction: ltr;
   vertical-align: top;
   user-select: none;
-  border-radius: 8px;
+  border-radius: 7px;
   background: #fff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  /* Inset shadow draws a thin black outline that follows the rounded
+     corners so the card edge is clearly visible on light backgrounds. */
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.7),
+    0 2px 5px rgba(0, 0, 0, 0.28);
   transition: box-shadow 0.12s ease, transform 0.12s ease;
   overflow: hidden;
   position: relative;
@@ -28,22 +32,29 @@
 }
 
 .card-svg.small {
-  width: clamp(48px, 9vw, 68px);
+  width: clamp(40px, 7vw, 56px);
   border-radius: 5px;
 }
 
+/* Trump highlight uses amber so it doesn't clash with the purple
+   "playable card" outline drawn on .draggable-card-wrap. The inner
+   black 1px outline is kept for consistency with non-trump cards. */
 .card-svg.trump {
-  /* Coloured frame layered on top of the card border so the trump card
-     stands out. Inset so it sits inside the rounded corners. */
-  box-shadow: inset 0 0 0 3px var(--accent, #aa3bff),
-    0 1px 3px rgba(0, 0, 0, 0.2);
+  box-shadow:
+    0 0 0 3px #f59e0b,
+    inset 0 0 0 1px rgba(0, 0, 0, 0.7),
+    0 2px 5px rgba(0, 0, 0, 0.3);
 }
 
 .card-svg:hover {
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.7),
+    0 4px 10px rgba(0, 0, 0, 0.32);
 }
 
 .card-svg.trump:hover {
-  box-shadow: inset 0 0 0 3px var(--accent, #aa3bff),
-    0 3px 8px rgba(0, 0, 0, 0.25);
+  box-shadow:
+    0 0 0 3px #f59e0b,
+    inset 0 0 0 1px rgba(0, 0, 0, 0.7),
+    0 4px 10px rgba(0, 0, 0, 0.35);
 }
