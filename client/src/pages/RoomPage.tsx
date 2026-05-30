@@ -101,30 +101,25 @@ function RoomPage() {
   useEffect(() => () => clearRoomCache(), []);
 
   // Show a one-off toast at the start of each game explaining who's the
-  // first attacker and why (6 of trumps / previous winner / random).
-  // Keyed by a counter that increments every time we see a fresh playing
-  // phase + firstAttackerReason combination, so restarts also trigger it.
-  const lastShownReasonRef = useRef<string | null>(null);
+  // first attacker and why. The server sets firstAttackerReason in
+  // startGame and clears it (to null) after the first action of the round,
+  // so we just fire on the null→value transition. Restarts work because
+  // the server sets a fresh reason in the new game.
+  const prevReasonRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!gameState || gameState.phase !== 'playing') {
-      lastShownReasonRef.current = null;
-      return;
+    const reason = gameState?.firstAttackerReason ?? null;
+    if (reason && reason !== prevReasonRef.current) {
+      const nickname =
+        gameState?.players[gameState.attackerIndex]?.nickname ?? '?';
+      if (reason === 'six_of_trumps') {
+        setToastMessage(t('game.first_attacker_six_of_trumps', { nickname }));
+      } else if (reason === 'previous_winner') {
+        setToastMessage(t('game.first_attacker_previous_winner', { nickname }));
+      } else {
+        setToastMessage(t('game.first_attacker_random'));
+      }
     }
-    const reason = gameState.firstAttackerReason;
-    if (!reason) return;
-    // Use a composite key (reason + attackerIndex + first player id) so the
-    // toast appears once per game start, not once per state update.
-    const key = `${reason}:${gameState.attackerIndex}:${gameState.players[gameState.attackerIndex]?.id ?? ''}`;
-    if (lastShownReasonRef.current === key) return;
-    lastShownReasonRef.current = key;
-    const nickname = gameState.players[gameState.attackerIndex]?.nickname ?? '?';
-    if (reason === 'six_of_trumps') {
-      setToastMessage(t('game.first_attacker_six_of_trumps', { nickname }));
-    } else if (reason === 'previous_winner') {
-      setToastMessage(t('game.first_attacker_previous_winner', { nickname }));
-    } else {
-      setToastMessage(t('game.first_attacker_random'));
-    }
+    prevReasonRef.current = reason;
   }, [gameState, t]);
 
   // On every (re)connect, try to rejoin the room using saved credentials.

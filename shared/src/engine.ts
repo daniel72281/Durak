@@ -179,7 +179,10 @@ export function applyAction(state: GameState, action: Action): EngineResult {
   // the round-transition check in completeRound and lets a winning play
   // (e.g. defender uses last card to defend; deck empty) end the game
   // immediately in a 2-player game rather than waiting for an explicit pass.
-  return ok(checkMidActionGameEnd(result.state));
+  // Also clear `firstAttackerReason` so the client's "X starts" toast only
+  // fires on game start, not on every state update mid-game.
+  const next = checkMidActionGameEnd(result.state);
+  return ok({ ...next, firstAttackerReason: null });
 }
 
 // If the deck is empty and a player's hand has just become empty, mark them
