@@ -136,18 +136,32 @@ describe('canAttackCard', () => {
     expect(canAttackCard(c('7', 'hearts'), table, 6, 5)).toBe(false);
   });
 
-  it('caps throw-ins at the defender hand size (user rule)', () => {
-    // Defender has 2 cards. 3 cards already on the table => no more allowed,
-    // even if the round cap (6) would otherwise permit it.
-    const table: TablePair[] = [
+  it('caps throw-ins by UNDEFENDED count vs defender hand (user rule)', () => {
+    // 3 attacks on the table, 1 of them undefended. Defender has 1 card.
+    // Throw-in would make 2 undefended for 1 card → blocked.
+    const tight: TablePair[] = [
       pair(c('7', 'spades'), c('K', 'spades')),
       pair(c('7', 'clubs'), c('A', 'clubs')),
       pair(c('7', 'diamonds')),
     ];
-    expect(canAttackCard(c('7', 'hearts'), table, 2, 6)).toBe(false);
-    // But if only 1 card on the table, defender (2 cards) can still take one more.
-    const small = [pair(c('7', 'diamonds'))];
-    expect(canAttackCard(c('7', 'hearts'), small, 2, 6)).toBe(true);
+    expect(canAttackCard(c('7', 'hearts'), tight, 1, 6)).toBe(false);
+    // But same table with defender hand of 2 → 1 undefended < 2 hand → allowed.
+    expect(canAttackCard(c('7', 'hearts'), tight, 2, 6)).toBe(true);
+  });
+
+  it('allows throw-ins when all current attacks are defended (regression: bug 2026-05-30)', () => {
+    // Real-game scenario from a user screenshot: 5 attacks on the table,
+    // all defended, defender has 1 card left. Throw-in would be 1 new
+    // undefended attack — defender can still defend it with their 1 card.
+    // Round cap is 6 (not round 1), so cap is not yet hit either.
+    const allDefended: TablePair[] = [
+      pair(c('6', 'hearts'), c('Q', 'hearts')),
+      pair(c('6', 'clubs'), c('8', 'diamonds')),
+      pair(c('6', 'spades'), c('9', 'diamonds')),
+      pair(c('Q', 'clubs'), c('K', 'clubs')),
+      pair(c('Q', 'spades'), c('J', 'diamonds')),
+    ];
+    expect(canAttackCard(c('K', 'diamonds'), allDefended, 1, 6)).toBe(true);
   });
 
   it('rejects any attack/throw-in when defender has zero cards (user rule)', () => {

@@ -230,6 +230,106 @@ describe('applyAction: attack', () => {
     });
     const r = applyAction(state, { type: 'attack', playerId: 'p2', card: eightH });
     expect(r.ok).toBe(false);
+    expect(r.ok || r.error).toBe('attack_rank_mismatch');
+  });
+
+  // Granular error codes — the client maps these to localised toasts.
+  it('returns attack_round_1_limit when the table is at the round-1 cap of 5', () => {
+    const table: TablePair[] = Array.from({ length: 5 }, () =>
+      pair(card('7', 'spades'), card('K', 'spades')),
+    );
+    const sevenH = card('7', 'hearts');
+    const state = makeState({
+      players: [
+        player('p0', [sevenH]),
+        player('p1', [card('A', 'spades'), card('A', 'hearts')]),
+      ],
+      table,
+      roundNumber: 1,
+      roundAttackLimit: 5,
+    });
+    const r = applyAction(state, { type: 'attack', playerId: 'p0', card: sevenH });
+    expect(r.ok).toBe(false);
+    expect(r.ok || r.error).toBe('attack_round_1_limit');
+  });
+
+  it('returns attack_round_limit when the table is at the round-2+ cap of 6', () => {
+    const table: TablePair[] = Array.from({ length: 6 }, () =>
+      pair(card('7', 'spades'), card('K', 'spades')),
+    );
+    const sevenH = card('7', 'hearts');
+    const state = makeState({
+      players: [
+        player('p0', [sevenH]),
+        player('p1', [card('A', 'spades'), card('A', 'hearts')]),
+      ],
+      table,
+      roundNumber: 2,
+      roundAttackLimit: 6,
+    });
+    const r = applyAction(state, { type: 'attack', playerId: 'p0', card: sevenH });
+    expect(r.ok).toBe(false);
+    expect(r.ok || r.error).toBe('attack_round_limit');
+  });
+
+  it('returns attack_defender_empty when defender has no cards (not taking)', () => {
+    const sevenH = card('7', 'hearts');
+    const state = makeState({
+      players: [player('p0', [sevenH]), player('p1', [])],
+      table: [pair(card('7', 'spades'), card('K', 'spades'))],
+      defenderTaking: false,
+    });
+    const r = applyAction(state, { type: 'attack', playerId: 'p0', card: sevenH });
+    expect(r.ok).toBe(false);
+    expect(r.ok || r.error).toBe('attack_defender_empty');
+  });
+
+  it('returns attack_defender_full:N when undefended count would exceed defender hand', () => {
+    // 3 attacks, 1 defended → 2 undefended already. Defender has 2 cards.
+    // A throw-in would make 3 undefended for 2 cards → blocked.
+    const sevenH = card('7', 'hearts');
+    const state = makeState({
+      players: [
+        player('p0', [sevenH]),
+        player('p1', [card('K', 'spades'), card('A', 'spades')]),
+      ],
+      table: [
+        pair(card('7', 'spades'), card('Q', 'spades')),
+        pair(card('7', 'clubs')),
+        pair(card('7', 'diamonds')),
+      ],
+      roundNumber: 2,
+      roundAttackLimit: 6,
+    });
+    const r = applyAction(state, { type: 'attack', playerId: 'p0', card: sevenH });
+    expect(r.ok).toBe(false);
+    expect(r.ok || r.error).toBe('attack_defender_full:2');
+  });
+
+  it('allows throw-in when all current attacks are defended (real-game bug 2026-05-30)', () => {
+    // Reproduces user-reported scenario: 5 defended pairs, defender holds 1
+    // card, round 2+. Adding a matching-rank throw-in is legal because the
+    // defender will have exactly enough cards to defend the new undefended
+    // attack. The earlier rule wrongly counted the defended pairs against
+    // the defender's current hand and blocked this move.
+    const kingD = card('K', 'diamonds');
+    const state = makeState({
+      players: [
+        player('p0', [kingD]),
+        player('p1', [card('A', 'hearts')]), // defender, 1 card
+      ],
+      table: [
+        pair(card('6', 'hearts'), card('Q', 'hearts')),
+        pair(card('6', 'clubs'), card('8', 'diamonds')),
+        pair(card('6', 'spades'), card('9', 'diamonds')),
+        pair(card('Q', 'clubs'), card('K', 'clubs')),
+        pair(card('Q', 'spades'), card('J', 'diamonds')),
+      ],
+      roundNumber: 2,
+      roundAttackLimit: 6,
+    });
+    const r = applyAction(state, { type: 'attack', playerId: 'p0', card: kingD });
+    expect(r.ok).toBe(true);
   });
 });
 

@@ -106,9 +106,22 @@ function RoomPage() {
 
   const handleGameAction = (action: Action) => {
     socket.emit('game:action', action, (ack) => {
-      if (!ack.ok) setToastMessage(ack.error);
+      if (!ack.ok) setToastMessage(translateGameError(ack.error));
     });
   };
+
+  // Engine returns short codes like 'attack_round_1_limit' or
+  // 'attack_defender_full:3'; translate to a localised toast. Falls back to
+  // the raw error for anything we don't recognise.
+  function translateGameError(raw: string): string {
+    if (!raw.startsWith('attack_')) return raw;
+    const [code, arg] = raw.split(':');
+    const key = `game.error_${code}`;
+    if (code === 'attack_defender_full' && arg !== undefined) {
+      return t(key, { count: Number(arg), defaultValue: raw });
+    }
+    return t(key, { defaultValue: raw });
+  }
 
   if (closedReason) {
     const reasonText: Record<RoomClosedReason, string> = {

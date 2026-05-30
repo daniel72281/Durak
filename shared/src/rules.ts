@@ -57,15 +57,17 @@ export function rankIsOnTable(card: Card, table: readonly TablePair[]): boolean 
 // Is `card` a legal attack/throw-in right now?
 //   - Table empty: any card is a legal opening attack.
 //   - Otherwise:   card's rank must match some rank already on the table.
-//   - Total attacks must stay under min(roundAttackLimit, defenderHandSize):
-//     the defender can never be attacked with more cards than they hold,
-//     and the round cap (5 in round 1, 6 in round 2+) is an additional
-//     hard ceiling.
+//   - Total attacks must stay under `roundAttackLimit` (5 in round 1,
+//     6 in round 2+).
+//   - **Undefended** attacks must stay under `defenderHandSize`. Defended
+//     pairs don't count against this — the defender already paid for them
+//     with cards. The check is `undefendedCount < defenderHandSize`, so
+//     adding this throw-in still leaves the defender enough cards to
+//     cover every undefended attack (including the new one).
 //   - Callers should pass `Number.POSITIVE_INFINITY` for `defenderHandSize`
 //     when the defender has already declared 'take' — in that case they're
 //     collecting everything, so hand size doesn't matter and only the
-//     round cap applies. (This also covers the 0-card-defender-while-taking
-//     case: throw-ins keep working.)
+//     round cap applies.
 //
 // Note: this does not check WHO is playing the card. The caller (engine)
 // enforces that the opening attack comes from `attackerIndex` and that
@@ -76,8 +78,9 @@ export function canAttackCard(
   defenderHandSize: number,
   roundAttackLimit: number,
 ): boolean {
-  const effectiveLimit = Math.min(roundAttackLimit, defenderHandSize);
-  if (table.length >= effectiveLimit) return false;
+  if (table.length >= roundAttackLimit) return false;
+  const undefended = table.reduce((n, p) => p.defense === undefined ? n + 1 : n, 0);
+  if (undefended >= defenderHandSize) return false;
   if (table.length === 0) return true;
   return rankIsOnTable(card, table);
 }

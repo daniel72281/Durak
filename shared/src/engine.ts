@@ -202,7 +202,7 @@ function handleAttack(
 
   // Opening attack must come from the official attacker.
   if (state.table.length === 0 && playerIdx !== state.attackerIndex) {
-    return fail('opening attack must come from the attacker');
+    return fail('attack_not_opener');
   }
 
   const player = state.players[playerIdx]!;
@@ -210,7 +210,7 @@ function handleAttack(
 
   // When the defender has declared take, they're collecting whatever's
   // thrown on them — hand size becomes irrelevant. Otherwise we honour
-  // the "no attacks to a 0-card defender" rule from canAttackCard.
+  // the "undefended-attacks <= defender-hand" rule from canAttackCard.
   const defenderHand = state.players[state.defenderIndex]!.hand.length;
   const effectiveDefenderHand = state.defenderTaking
     ? Number.POSITIVE_INFINITY
@@ -218,7 +218,24 @@ function handleAttack(
   if (
     !canAttackCard(action.card, state.table, effectiveDefenderHand, state.roundAttackLimit)
   ) {
-    return fail('card is not a legal attack now');
+    // Figure out the specific reason so the client can show a useful toast.
+    // Order matters — the round cap is the highest-level ceiling.
+    if (state.table.length >= state.roundAttackLimit) {
+      return state.roundNumber === 1
+        ? fail('attack_round_1_limit')
+        : fail('attack_round_limit');
+    }
+    if (defenderHand === 0 && !state.defenderTaking) {
+      return fail('attack_defender_empty');
+    }
+    const undefended = state.table.reduce(
+      (n, p) => p.defense === undefined ? n + 1 : n,
+      0,
+    );
+    if (undefended >= effectiveDefenderHand) {
+      return fail(`attack_defender_full:${defenderHand}`);
+    }
+    return fail('attack_rank_mismatch');
   }
 
   const newPlayers = replacePlayer(state.players, playerIdx, {
