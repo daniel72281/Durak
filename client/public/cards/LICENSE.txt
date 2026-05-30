@@ -1,3 +1,6 @@
-SVG playing cards (svg-cards.svg) by David Bellot (2005) and Huub de Beer
-(2016, 2017). Used under the GNU Lesser General Public License v2.1 or
-later. Source: https://github.com/htdebeer/SVG-cards
+Vector Playing Cards (bicycle/*.svg) by Chris Aguilar — "Vectorized
+Playing Cards 2.0". Dual-licensed under LGPL 3.0 and GPL 3.0.
+Source: https://totalnonsense.com/open-source-vector-playing-cards/
+Repackaged via: https://github.com/notpeter/Vector-Playing-Cards
+
+Only ranks 6 through Ace are bundled (the 36-card Durak deck).

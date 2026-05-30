@@ -1,38 +1,49 @@
-/* SVG playing card. The actual artwork comes from the David Bellot /
-   Huub de Beer sprite at /cards/svg-cards.svg (LGPL). We just size the
-   <svg> wrapper here; the viewBox keeps the card proportional. */
+/* SVG playing card. Artwork from /cards/bicycle/{rank}{suit}.svg —
+   Chris Aguilar's Vectorized Playing Cards (LGPL), Bicycle-style. */
 
 .card-svg {
   display: inline-block;
-  /* Default desktop: bigger so the painted corner indices are legible.
-     Scales down responsively on narrow viewports (mobile) so 6 cards
-     still fit in a hand without horizontal scroll. */
-  width: clamp(64px, 13vw, 96px);
-  /* Card aspect ratio is 169:244 ≈ 1.445. */
-  aspect-ratio: 169 / 244;
-  height: auto;
+  /* Default desktop: large enough that pip indices and face artwork
+     read clearly. Scales down responsively on narrow viewports so a
+     6-card hand still fits without horizontal scroll. */
+  width: clamp(72px, 14vw, 108px);
+  /* Card aspect ratio in source SVGs: 167.087 : 242.667 ≈ 0.689. */
+  aspect-ratio: 167 / 242;
   direction: ltr;
   vertical-align: top;
   user-select: none;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.15));
-  transition: filter 0.12s ease;
-  /* Encourage sharper edges on the small painted text/pips. */
-  shape-rendering: geometricPrecision;
-  text-rendering: geometricPrecision;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: box-shadow 0.12s ease, transform 0.12s ease;
+  overflow: hidden;
+  position: relative;
+}
+
+.card-svg img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
 }
 
 .card-svg.small {
-  width: clamp(44px, 8vw, 60px);
-  aspect-ratio: 169 / 244;
-  height: auto;
+  width: clamp(48px, 9vw, 68px);
+  border-radius: 5px;
 }
 
-.card-svg .trump-frame {
-  fill: none;
-  stroke: var(--accent, #7c3aed);
-  stroke-width: 6;
+.card-svg.trump {
+  /* Coloured frame layered on top of the card border so the trump card
+     stands out. Inset so it sits inside the rounded corners. */
+  box-shadow: inset 0 0 0 3px var(--accent, #aa3bff),
+    0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .card-svg:hover {
-  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.2));
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
+}
+
+.card-svg.trump:hover {
+  box-shadow: inset 0 0 0 3px var(--accent, #aa3bff),
+    0 3px 8px rgba(0, 0, 0, 0.25);
 }
