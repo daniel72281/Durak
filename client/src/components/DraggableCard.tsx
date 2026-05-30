@@ -11,14 +11,38 @@ interface Props {
   isLegal?: boolean;
   disabled?: boolean;
   onClick?: () => void;
+  // 0-based position in the deal — staggers the entrance so a fresh
+  // hand visually arrives one card at a time. ~220 ms per step + a soft
+  // spring makes the whole 6-card deal take roughly 2 seconds.
+  dealIndex?: number;
+  // True when this card just moved into the hand FROM the table (e.g.
+  // the defender took the pile). In that case we skip the "fly from the
+  // deck" initial so framer-motion's layoutId animation kicks in and
+  // flies it from its table position instead.
+  fromTable?: boolean;
 }
 
-// Outer wrapper is a motion.div — owns layout/layoutId transitions so
-// the same card flying from the deck-stack origin into the hand, or
-// from the hand onto the table, gets a smooth animation. dnd-kit's
-// drag transform lives on the inner div to avoid clashing with
-// framer's own transform property.
-function DraggableCard({ card, isTrump, isLegal, disabled, onClick }: Props) {
+// Outer motion.div owns both the deal-in (initial→animate) and the
+// hand↔table shared transition (layoutId). Going back to framer-motion's
+// built-in initial/animate props turned out to be the most reliable
+// way to stagger; mixing in WAAPI / animation-controls broke the
+// timing handshake with the layoutId animation.
+//
+// The -320 / -240 offset is roughly where the deck pile sits on a
+// desktop viewport — not a measured value, but visually it reads as
+// "card flicks off the top-left of the felt".
+//
+// dnd-kit's drag transform stays on a plain inner div so it doesn't
+// clash with framer's own transform property.
+function DraggableCard({
+  card,
+  isTrump,
+  isLegal,
+  disabled,
+  onClick,
+  dealIndex = 0,
+  fromTable = false,
+}: Props) {
   const id = `card:${cardKey(card)}`;
   const { attributes, listeners, setNodeRef, isDragging, transform } = useDraggable({
     id,
@@ -37,17 +61,27 @@ function DraggableCard({ card, isTrump, isLegal, disabled, onClick }: Props) {
     <motion.div
       layoutId={id}
       layout
-      // On mount: slide in from roughly where the deck pile sits (top-
-      // left of the felt) — looks like a dealer flicking the card over.
-      initial={{ x: -260, y: -180, opacity: 0, scale: 0.55, rotate: -14 }}
+      // fromTable=true means this card just appeared in the hand because
+      // the defender took the pile — let framer's layoutId animate it
+      // from its previous table position instead of forcing a deck deal.
+      initial={
+        fromTable
+          ? false
+          : { x: -320, y: -240, opacity: 0, scale: 0.5, rotate: -14 }
+      }
       animate={{ x: 0, y: 0, opacity: 1, scale: 1, rotate: 0 }}
-      transition={{
-        type: 'spring',
-        stiffness: 220,
-        damping: 26,
-        opacity: { duration: 0.18 },
-        layout: { type: 'spring', stiffness: 260, damping: 28 },
-      }}
+      transition={
+        fromTable
+          ? { layout: { type: 'spring', stiffness: 180, damping: 22 } }
+          : {
+              type: 'spring',
+              stiffness: 100,
+              damping: 18,
+              delay: dealIndex * 0.22,
+              opacity: { duration: 0.3, delay: dealIndex * 0.22 },
+              layout: { type: 'spring', stiffness: 260, damping: 28 },
+            }
+      }
     >
       <div
         ref={setNodeRef}

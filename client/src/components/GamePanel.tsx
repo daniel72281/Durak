@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   DndContext,
   PointerSensor,
@@ -16,8 +16,18 @@ import PlayerList from './PlayerList';
 import ActionButtons from './ActionButtons';
 import TurnTimer from './TurnTimer';
 import SortToggle from './SortToggle';
+import TakeFlightOverlay from './TakeFlightOverlay';
 import { computeLegalMoves, cardKey } from '../utils/legalMoves';
 import './GamePanel.css';
+
+interface TakeFlightSpec {
+  fromX: number;
+  fromY: number;
+  toX: number;
+  toY: number;
+  count: number;
+  id: number;
+}
 
 interface Props {
   state: ClientGameState;
@@ -28,6 +38,81 @@ interface Props {
 function GamePanel({ state, onAction, onShowError }: Props) {
   const { t } = useTranslation();
   const [sortMode, setSortMode] = useState<SortMode>('rank');
+
+  // Track previous state so we can detect "defender just took the pile"
+  // and play a ghost-card trail flying from the table to their chip.
+  // We only fire this for OTHER players' takes — when the local player
+  // takes, the existing layoutId animation on each card already shows
+  // the cards flying back to their hand.
+  const prevStateRef = useRef<ClientGameState | null>(null);
+  const [takeFlight, setTakeFlight] = useState<TakeFlightSpec | null>(null);
+
+  useEffect(() => {
+    const prev = prevStateRef.current;
+    prevStateRef.current = state;
+    if (!prev) return;
+
+    const tookPile =
+      prev.table.length > 0 &&
+      state.table.length === 0 &&
+      prev.defenderTaking;
+    if (!tookPile) return;
+
+    const taker = state.players[prev.defenderIndex];
+    if (!taker) return;
+    const selfId = state.players[state.selfIndex]?.id;
+    if (taker.id === selfId) return; // local defender → layoutId handles it
+
+    const tableEl = document.querySelector('.table');
+    const chipEl = document.querySelector(
+      `[data-player-id="${taker.id}"]`,
+    );
+    if (!tableEl || !chipEl) return;
+
+    const tableRect = tableEl.getBoundingClientRect();
+    const chipRect = chipEl.getBoundingClientRect();
+    const cardCount = prev.table.reduce(
+      (n, p) => n + (p.defense ? 2 : 1),
+      0,
+    );
+
+    setTakeFlight({
+      fromX: tableRect.left + tableRect.width / 2,
+      fromY: tableRect.top + tableRect.height / 2,
+      toX: chipRect.left + chipRect.width / 2,
+      toY: chipRect.top + chipRect.height / 2,
+      count: cardCount,
+      id: Date.now(),
+    });
+  }, [state]);
+
+  // Synchronously detect "I just took the pile" so the freshly-added
+  // hand cards mount with fromTable=true → their layoutId animation flies
+  // them from the table position instead of dealing them from the deck.
+  // Must happen during render (not useEffect) so the cards' very first
+  // mount sees the correct prop. prevStateRef is still the previous
+  // render's state until the useEffect above commits.
+  const prevForTakeSync = prevStateRef.current;
+  let justTakenKeys: ReadonlySet<string> | undefined;
+  if (
+    prevForTakeSync &&
+    prevForTakeSync !== state &&
+    prevForTakeSync.table.length > 0 &&
+    state.table.length === 0 &&
+    prevForTakeSync.defenderTaking
+  ) {
+    const taker = state.players[prevForTakeSync.defenderIndex];
+    const selfId = state.players[state.selfIndex]?.id;
+    if (taker && taker.id === selfId) {
+      justTakenKeys = new Set(
+        prevForTakeSync.table.flatMap((p) =>
+          p.defense
+            ? [cardKey(p.attack), cardKey(p.defense)]
+            : [cardKey(p.attack)],
+        ),
+      );
+    }
+  }
 
   const self = state.players[state.selfIndex];
   const myId = self?.id ?? '';
@@ -210,10 +295,22 @@ function GamePanel({ state, onAction, onShowError }: Props) {
               legalMoves={legalMoves}
               sortMode={sortMode}
               onCardClick={handleCardClick}
+              fromTableKeys={justTakenKeys}
             />
           </div>
         )}
       </div>
+      {takeFlight && (
+        <TakeFlightOverlay
+          key={takeFlight.id}
+          fromX={takeFlight.fromX}
+          fromY={takeFlight.fromY}
+          toX={takeFlight.toX}
+          toY={takeFlight.toY}
+          count={takeFlight.count}
+          onDone={() => setTakeFlight(null)}
+        />
+      )}
     </DndContext>
   );
 }
