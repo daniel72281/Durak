@@ -32,7 +32,7 @@
     "error_attack_round_1_limit": "Round 1 — attacks limited to 5 cards",
     "error_attack_round_limit": "Attacks limited to 6 cards",
     "error_attack_defender_empty": "Defender has no cards — can't attack",
-    "error_attack_defender_full": "Defender has only {{count}} cards — can't add more",
+    "error_attack_defender_full": "Defender limited to {{count}} attacks this round",
     "error_attack_rank_mismatch": "Card rank doesn't match the table",
     "error_attack_not_opener": "Only the lead attacker can open the round",
     "sort_by_rank": "Sort: by rank",

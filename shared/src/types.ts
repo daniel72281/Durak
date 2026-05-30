@@ -51,6 +51,11 @@ export interface GameState {
   roundAttackLimit: number; // max attacks this round (computed at round start)
   passedPlayerIds: string[]; // non-defenders who have declared "pass" this round
   defenderTaking: boolean;  // true once defender declared 'take' (more throw-ins allowed)
+  // Number of cards the defender held at the START of the current round (or
+  // at the moment a transfer made them the defender). The total attacks
+  // this round can never exceed this number — even if the defender has
+  // declared `take`. Refreshed in startGame / completeRound / handleTransfer.
+  defenderRoundStartHandSize: number;
   // Order in which players emptied their hand (with deck also empty) — the
   // first id is 1st place, last is 2nd-to-last. The durak is the one NOT in
   // this list (set as `loser` once game ends).
@@ -105,6 +110,7 @@ export interface ClientGameState {
   attackerIndex: number;
   defenderIndex: number;
   defenderTaking: boolean;
+  defenderRoundStartHandSize: number;
   passedPlayerIds: string[];
   // Absolute epoch ms when the current required action times out, or null
   // when no timer is active (game finished / waiting for nothing).

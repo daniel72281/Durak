@@ -59,15 +59,16 @@ export function rankIsOnTable(card: Card, table: readonly TablePair[]): boolean 
 //   - Otherwise:   card's rank must match some rank already on the table.
 //   - Total attacks must stay under `roundAttackLimit` (5 in round 1,
 //     6 in round 2+).
-//   - **Undefended** attacks must stay under `defenderHandSize`. Defended
-//     pairs don't count against this — the defender already paid for them
-//     with cards. The check is `undefendedCount < defenderHandSize`, so
-//     adding this throw-in still leaves the defender enough cards to
-//     cover every undefended attack (including the new one).
-//   - Callers should pass `Number.POSITIVE_INFINITY` for `defenderHandSize`
-//     when the defender has already declared 'take' — in that case they're
-//     collecting everything, so hand size doesn't matter and only the
-//     round cap applies.
+//   - Total attacks must stay under `defenderRoundStartHandSize` — the
+//     defender can never be hit with more cards in a single round than
+//     they held at the round's START. This applies **even when the
+//     defender has declared 'take'** (they don't get a free pass to
+//     receive unlimited cards).
+//   - **Undefended** attacks must stay under `defenderHandSize` (current).
+//     Defended pairs don't count against this — the defender already paid
+//     for them with cards. Callers pass `Number.POSITIVE_INFINITY` for
+//     `defenderHandSize` when the defender is taking (so this check is a
+//     no-op while taking; the round-start cap above is the active limit).
 //
 // Note: this does not check WHO is playing the card. The caller (engine)
 // enforces that the opening attack comes from `attackerIndex` and that
@@ -76,9 +77,11 @@ export function canAttackCard(
   card: Card,
   table: readonly TablePair[],
   defenderHandSize: number,
+  defenderRoundStartHandSize: number,
   roundAttackLimit: number,
 ): boolean {
   if (table.length >= roundAttackLimit) return false;
+  if (table.length >= defenderRoundStartHandSize) return false;
   const undefended = table.reduce((n, p) => p.defense === undefined ? n + 1 : n, 0);
   if (undefended >= defenderHandSize) return false;
   if (table.length === 0) return true;

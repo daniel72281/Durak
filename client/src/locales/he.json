@@ -32,7 +32,7 @@
     "error_attack_round_1_limit": "סיבוב ראשון – תקיפה מותרת עד 5 קלפים",
     "error_attack_round_limit": "תקיפה מותרת עד 6 קלפים",
     "error_attack_defender_empty": "אין למתגונן קלפים — אי אפשר לתקוף",
-    "error_attack_defender_full": "למתגונן יש רק {{count}} קלפים — אי אפשר להוסיף עוד",
+    "error_attack_defender_full": "תקיפה על המתגונן הוגבלה ל-{{count}} קלפים בסיבוב הזה",
     "error_attack_rank_mismatch": "הקלף לא מתאים לדרגות שעל השולחן",
     "error_attack_not_opener": "רק התוקף הראשי יכול לפתוח את הסיבוב",
     "sort_by_rank": "מיון: לפי דרגה",

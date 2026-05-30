@@ -119,41 +119,69 @@ describe('rankIsOnTable', () => {
 });
 
 describe('canAttackCard', () => {
+  // Signature: canAttackCard(card, table, defenderHand, defenderRoundStart, roundCap)
   it('opening attack: any card on empty table when defender has cards', () => {
-    expect(canAttackCard(c('6', 'hearts'), [], 6, 5)).toBe(true);
+    expect(canAttackCard(c('6', 'hearts'), [], 6, 6, 5)).toBe(true);
   });
 
   it('throw-in: must match a rank already on the table', () => {
     const table = [pair(c('7', 'spades'))];
-    expect(canAttackCard(c('7', 'hearts'), table, 6, 5)).toBe(true);
-    expect(canAttackCard(c('8', 'hearts'), table, 6, 5)).toBe(false);
+    expect(canAttackCard(c('7', 'hearts'), table, 6, 6, 5)).toBe(true);
+    expect(canAttackCard(c('8', 'hearts'), table, 6, 6, 5)).toBe(false);
   });
 
   it('rejects when table is at the round attack limit', () => {
     const table: TablePair[] = Array(5)
       .fill(null)
       .map(() => pair(c('7', 'spades'), c('K', 'spades')));
-    expect(canAttackCard(c('7', 'hearts'), table, 6, 5)).toBe(false);
+    expect(canAttackCard(c('7', 'hearts'), table, 6, 6, 5)).toBe(false);
   });
 
-  it('caps throw-ins by UNDEFENDED count vs defender hand (user rule)', () => {
-    // 3 attacks on the table, 1 of them undefended. Defender has 1 card.
+  it('caps throw-ins by UNDEFENDED count vs defender CURRENT hand', () => {
+    // 3 attacks on the table, 1 undefended. Defender has 1 card (current).
+    // round-start was 5 so the round-start cap isn't hit yet.
     // Throw-in would make 2 undefended for 1 card → blocked.
     const tight: TablePair[] = [
       pair(c('7', 'spades'), c('K', 'spades')),
       pair(c('7', 'clubs'), c('A', 'clubs')),
       pair(c('7', 'diamonds')),
     ];
-    expect(canAttackCard(c('7', 'hearts'), tight, 1, 6)).toBe(false);
-    // But same table with defender hand of 2 → 1 undefended < 2 hand → allowed.
-    expect(canAttackCard(c('7', 'hearts'), tight, 2, 6)).toBe(true);
+    expect(canAttackCard(c('7', 'hearts'), tight, 1, 5, 6)).toBe(false);
+    // Same table, defender current 2 → 1 < 2 → allowed.
+    expect(canAttackCard(c('7', 'hearts'), tight, 2, 5, 6)).toBe(true);
+  });
+
+  it('caps total attacks by defender ROUND-START hand size (user rule)', () => {
+    // Defender started the round holding 5 cards. They defended 4 of the 5
+    // attacks already on the table (1 undefended, 1 in hand) — round-start
+    // cap is 5, table is at 5 → no more attacks allowed even though the
+    // current undefended (1) < currentHand (1) wouldn't block it.
+    const table: TablePair[] = [
+      pair(c('7', 'spades'), c('Q', 'spades')),
+      pair(c('7', 'clubs'), c('Q', 'clubs')),
+      pair(c('7', 'diamonds'), c('Q', 'diamonds')),
+      pair(c('7', 'hearts'), c('Q', 'hearts')),
+      pair(c('K', 'spades')),
+    ];
+    expect(canAttackCard(c('K', 'hearts'), table, 1, 5, 6)).toBe(false);
+  });
+
+  it('round-start cap applies even when the defender is TAKING (user rule)', () => {
+    // Defender started with 5 cards, deck is empty, attacker filled the
+    // table with 5 attacks, defender pressed `take` (caller passes Infinity
+    // for currentHand). New throw-in would push table past round-start cap
+    // → blocked.
+    const table: TablePair[] = Array(5)
+      .fill(null)
+      .map(() => pair(c('7', 'spades')));
+    expect(
+      canAttackCard(c('7', 'hearts'), table, Number.POSITIVE_INFINITY, 5, 6),
+    ).toBe(false);
   });
 
   it('allows throw-ins when all current attacks are defended (regression: bug 2026-05-30)', () => {
-    // Real-game scenario from a user screenshot: 5 attacks on the table,
-    // all defended, defender has 1 card left. Throw-in would be 1 new
-    // undefended attack — defender can still defend it with their 1 card.
-    // Round cap is 6 (not round 1), so cap is not yet hit either.
+    // Defender started round with 6 cards; 5 defended on the table, 1 left
+    // in hand. Round cap 6, round-start cap 6. table=5 < 6, undefended=0 < 1.
     const allDefended: TablePair[] = [
       pair(c('6', 'hearts'), c('Q', 'hearts')),
       pair(c('6', 'clubs'), c('8', 'diamonds')),
@@ -161,23 +189,21 @@ describe('canAttackCard', () => {
       pair(c('Q', 'clubs'), c('K', 'clubs')),
       pair(c('Q', 'spades'), c('J', 'diamonds')),
     ];
-    expect(canAttackCard(c('K', 'diamonds'), allDefended, 1, 6)).toBe(true);
+    expect(canAttackCard(c('K', 'diamonds'), allDefended, 1, 6, 6)).toBe(true);
   });
 
   it('rejects any attack/throw-in when defender has zero cards (user rule)', () => {
-    // Opening attack to 0-card defender — blocked
-    expect(canAttackCard(c('6', 'hearts'), [], 0, 5)).toBe(false);
-    // Throw-in to 0-card defender — also blocked
+    expect(canAttackCard(c('6', 'hearts'), [], 0, 0, 5)).toBe(false);
     const table = [pair(c('7', 'spades'), c('K', 'spades'))];
-    expect(canAttackCard(c('7', 'hearts'), table, 0, 6)).toBe(false);
+    expect(canAttackCard(c('7', 'hearts'), table, 0, 6, 6)).toBe(false);
   });
 
-  it('still allows throw-ins to a 0-card defender who is taking (Infinity)', () => {
-    // When defender is taking, callers pass Infinity — the "0 cards" rule
-    // doesn't apply because the defender is collecting everything.
+  it('still allows throw-ins to a 0-current-card defender who is taking', () => {
+    // Defender took, currentHand=0 → caller passes Infinity. round-start
+    // was 6 so the cap allows up to 6 throw-ins.
     const table = [pair(c('7', 'spades'))];
     expect(
-      canAttackCard(c('7', 'hearts'), table, Number.POSITIVE_INFINITY, 6),
+      canAttackCard(c('7', 'hearts'), table, Number.POSITIVE_INFINITY, 6, 6),
     ).toBe(true);
   });
 });

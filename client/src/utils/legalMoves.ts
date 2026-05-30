@@ -91,6 +91,7 @@ export function computeLegalMoves(state: ClientGameState): LegalMoves {
             card,
             state.table,
             effectiveDefenderHand,
+            state.defenderRoundStartHandSize,
             computeAttackLimit(state),
           )
         ) {

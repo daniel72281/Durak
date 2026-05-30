@@ -35,6 +35,7 @@ function makeState(overrides: Partial<GameState> = {}): GameState {
     roundAttackLimit: 5,
     passedPlayerIds: [],
     defenderTaking: false,
+    defenderRoundStartHandSize: 6,
     outOrder: [],
     loser: null,
     endReason: null,
@@ -363,9 +364,31 @@ describe('applyAction: attack', () => {
       ],
       roundNumber: 2,
       roundAttackLimit: 6,
+      defenderRoundStartHandSize: 6,
     });
     const r = applyAction(state, { type: 'attack', playerId: 'p0', card: kingD });
     expect(r.ok).toBe(true);
+  });
+
+  it('round-start cap blocks throw-ins even when defender is TAKING (user rule)', () => {
+    // Defender started the round holding 5 cards (deck empty, late game).
+    // Attacker filled the table with 5 attacks, defender pressed `take`.
+    // Even with taking active, the total can't exceed 5.
+    const sevenH = card('7', 'hearts');
+    const state = makeState({
+      players: [
+        player('p0', [sevenH]),
+        player('p1', []), // already used all 5 cards trying to defend
+      ],
+      table: Array.from({ length: 5 }, () => pair(card('7', 'spades'))),
+      defenderTaking: true,
+      defenderRoundStartHandSize: 5,
+      roundNumber: 2,
+      roundAttackLimit: 6,
+    });
+    const r = applyAction(state, { type: 'attack', playerId: 'p0', card: sevenH });
+    expect(r.ok).toBe(false);
+    expect(r.ok || r.error).toBe('attack_defender_full:5');
   });
 });
 

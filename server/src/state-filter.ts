@@ -47,6 +47,7 @@ export function filterGameState(
     attackerIndex: state.attackerIndex,
     defenderIndex: state.defenderIndex,
     defenderTaking: state.defenderTaking,
+    defenderRoundStartHandSize: state.defenderRoundStartHandSize,
     passedPlayerIds: [...state.passedPlayerIds],
     turnDeadline,
     outOrder: [...state.outOrder],

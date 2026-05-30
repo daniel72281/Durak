@@ -72,6 +72,7 @@ export function createGame(
     roundAttackLimit: 0,
     passedPlayerIds: [],
     defenderTaking: false,
+    defenderRoundStartHandSize: 0,
     outOrder: [],
     loser: null,
     endReason: null,
@@ -121,6 +122,7 @@ export function startGame(
     roundAttackLimit,
     passedPlayerIds: [],
     defenderTaking: false,
+    defenderRoundStartHandSize: players[defenderIndex]!.hand.length,
     endReason: null,
     firstAttackerReason: pick.reason,
   });
@@ -235,22 +237,33 @@ function handleAttack(
   const player = state.players[playerIdx]!;
   if (!hasCard(player.hand, action.card)) return fail('card not in hand');
 
-  // When the defender has declared take, they're collecting whatever's
-  // thrown on them — hand size becomes irrelevant. Otherwise we honour
-  // the "undefended-attacks <= defender-hand" rule from canAttackCard.
+  // The defender's CURRENT hand size matters only for the "undefended <
+  // current-hand" check (which is bypassed when they're taking, by passing
+  // Infinity). The round-START hand size is the absolute round cap and
+  // applies even when taking.
   const defenderHand = state.players[state.defenderIndex]!.hand.length;
   const effectiveDefenderHand = state.defenderTaking
     ? Number.POSITIVE_INFINITY
     : defenderHand;
   if (
-    !canAttackCard(action.card, state.table, effectiveDefenderHand, state.roundAttackLimit)
+    !canAttackCard(
+      action.card,
+      state.table,
+      effectiveDefenderHand,
+      state.defenderRoundStartHandSize,
+      state.roundAttackLimit,
+    )
   ) {
     // Figure out the specific reason so the client can show a useful toast.
-    // Order matters — the round cap is the highest-level ceiling.
+    // Order matters — the round cap is the highest-level ceiling, then the
+    // round-START cap (applies even while taking), then current-hand checks.
     if (state.table.length >= state.roundAttackLimit) {
       return state.roundNumber === 1
         ? fail('attack_round_1_limit')
         : fail('attack_round_limit');
+    }
+    if (state.table.length >= state.defenderRoundStartHandSize) {
+      return fail(`attack_defender_full:${state.defenderRoundStartHandSize}`);
     }
     if (defenderHand === 0 && !state.defenderTaking) {
       return fail('attack_defender_empty');
@@ -341,6 +354,9 @@ function handleTransfer(
     table: [...state.table, { attack: action.card }],
     defenderIndex: newDefenderIdx,
     roundAttackLimit: newRoundAttackLimit,
+    // Transfer hands the defending seat to the next player; their
+    // current hand size becomes the new round-start cap.
+    defenderRoundStartHandSize: newDefenderHand,
     passedPlayerIds: [],
   });
 }
@@ -487,6 +503,9 @@ function completeRound(state: GameState): GameState {
     table: [],
     passedPlayerIds: [],
     defenderTaking: false,
+    // The new defender just got replenished — record their starting hand
+    // size for the new round's cap.
+    defenderRoundStartHandSize: players[nextDefenderIdx]?.hand.length ?? 0,
     outOrder: newOutOrder,
     attackerIndex: nextAttackerIdx,
     defenderIndex: nextDefenderIdx,
