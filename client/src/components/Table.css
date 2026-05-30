@@ -22,9 +22,10 @@
 .pair {
   position: relative;
   display: inline-block;
-  /* Room for the defense card to overlay diagonally without clipping. */
-  width: 78px;
-  height: 100px;
+  /* Sized to fit a card (clamp 64–96px wide) plus room for the diagonal
+     defense overlay (~25% offset). Grows/shrinks with viewport. */
+  width: clamp(86px, 17vw, 126px);
+  height: clamp(124px, 25vw, 180px);
 }
 
 .pair .attack-slot {
@@ -34,10 +35,10 @@
 }
 
 .pair .defense-overlay {
-  /* Offset diagonally so the attack's top-left corner index stays visible. */
+  /* Offset diagonally — uses % of the .pair so it scales with the card. */
   position: absolute;
-  top: 18px;
-  left: 18px;
+  top: 18%;
+  left: 18%;
   z-index: 2;
 }
 
@@ -56,8 +57,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 80px;
-  height: 90px;
+  min-width: 90px;
+  height: clamp(110px, 21vw, 150px);
   padding: 8px;
   border: 2px dashed rgba(170, 59, 255, 0.4);
   border-radius: 6px;
@@ -79,8 +80,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 80px;
-  height: 90px;
+  min-width: 90px;
+  height: clamp(110px, 21vw, 150px);
   padding: 8px;
   border: 2px dashed rgba(34, 139, 34, 0.3);
   border-radius: 6px;

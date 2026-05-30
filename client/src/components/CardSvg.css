@@ -4,18 +4,27 @@
 
 .card-svg {
   display: inline-block;
-  width: 60px;
-  height: 87px;
+  /* Default desktop: bigger so the painted corner indices are legible.
+     Scales down responsively on narrow viewports (mobile) so 6 cards
+     still fit in a hand without horizontal scroll. */
+  width: clamp(64px, 13vw, 96px);
+  /* Card aspect ratio is 169:244 ≈ 1.445. */
+  aspect-ratio: 169 / 244;
+  height: auto;
   direction: ltr;
   vertical-align: top;
   user-select: none;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.15));
   transition: filter 0.12s ease;
+  /* Encourage sharper edges on the small painted text/pips. */
+  shape-rendering: geometricPrecision;
+  text-rendering: geometricPrecision;
 }
 
 .card-svg.small {
-  width: 40px;
-  height: 58px;
+  width: clamp(44px, 8vw, 60px);
+  aspect-ratio: 169 / 244;
+  height: auto;
 }
 
 .card-svg .trump-frame {
