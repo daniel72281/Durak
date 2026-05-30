@@ -59,3 +59,24 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
+
+/* Dark-context overrides when this list sits inside the playing surface.
+   Waiting-room PlayerList (in RoomPage, outside .game-panel) keeps the
+   default light styling above. */
+.game-panel .player-row {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--game-text);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.game-panel .player-row.self {
+  background: rgba(170, 59, 255, 0.22);
+  color: #fff;
+  border-color: rgba(170, 59, 255, 0.55);
+}
+
+.game-panel .pass-badge,
+.game-panel .out-badge {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--game-text-muted);
+}

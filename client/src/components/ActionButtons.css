@@ -5,17 +5,28 @@
   justify-content: center;
 }
 
+/* Filled accent buttons read well on the dark felt background — an
+   outline-only button disappears against the navy/green. */
 .action-buttons button.secondary {
-  background: transparent;
-  color: var(--accent);
-  border: 1px solid var(--accent);
-  padding: 10px 20px;
-  border-radius: 6px;
+  background: var(--accent, #aa3bff);
+  color: #fff;
+  border: 1px solid var(--accent, #aa3bff);
+  padding: 10px 22px;
+  border-radius: 999px;
   font-size: 16px;
+  font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.2s;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  transition: transform 0.12s, box-shadow 0.12s, background-color 0.12s;
 }
 
 .action-buttons button.secondary:hover {
-  background-color: var(--accent-bg);
+  background-color: #b955ff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+}
+
+.action-buttons button.secondary:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }

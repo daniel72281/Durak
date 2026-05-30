@@ -1,8 +1,28 @@
+/* Game panel = the entire playing surface. Defines its own dark palette
+   so HomePage / RoomPage waiting state stay on the user's system theme;
+   only this container goes "casino dark". All child components that
+   want to opt into the dark scheme read these scoped vars. */
 .game-panel {
+  --game-bg: #0f1620;
+  --game-text: #e5e7eb;
+  --game-text-muted: #9ca3af;
+  --felt-center: #1d6b44;
+  --felt-edge: #0f4429;
+  --felt-rim: #08291a;
+
   display: flex;
   flex-direction: column;
   gap: 16px;
-  align-items: center;
+  align-items: stretch;
+  background: var(--game-bg);
+  color: var(--game-text);
+  padding: 16px;
+  border-radius: 12px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+}
+
+.game-panel > * {
+  flex-shrink: 0;
 }
 
 .game-meta {
@@ -12,28 +32,33 @@
   flex-wrap: wrap;
   justify-content: center;
   font-size: 14px;
-  color: var(--text);
+  color: var(--game-text-muted);
+  padding: 4px 0;
 }
 
 .trump-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  color: var(--game-text);
 }
 
 .role-banner {
-  padding: 8px 16px;
-  border-radius: 6px;
-  background: var(--accent-bg);
-  color: var(--accent);
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: rgba(170, 59, 255, 0.18);
+  color: #fff;
+  border: 1px solid var(--accent, #aa3bff);
   font-size: 15px;
   font-weight: 500;
   text-align: center;
+  align-self: center;
 }
 
 .role-banner--muted {
-  background: transparent;
-  color: var(--muted, #888);
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: var(--game-text-muted);
   font-weight: 400;
   font-style: italic;
 }
@@ -55,7 +80,7 @@
 
 .hand-label {
   font-size: 13px;
-  color: var(--text);
+  color: var(--game-text-muted);
   text-transform: uppercase;
   letter-spacing: 1px;
 }
