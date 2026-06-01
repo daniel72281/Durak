@@ -1,4 +1,3 @@
-import { AnimatePresence } from 'framer-motion';
 import type { Card, Suit } from '@shared/types';
 import { rankValue } from '@shared/rules';
 import DraggableCard from './DraggableCard';
@@ -13,11 +12,6 @@ interface Props {
   legalMoves: LegalMoves;
   sortMode: SortMode;
   onCardClick: (card: Card) => void;
-  // Card keys (e.g. "6H") that arrived in the hand on THIS render because
-  // the local player took the pile. Cards in this set skip the "deal
-  // from deck" entrance so they animate from their old table position
-  // via framer-motion's layoutId instead.
-  fromTableKeys?: ReadonlySet<string>;
 }
 
 const SUIT_ORDER: Record<Suit, number> = {
@@ -55,40 +49,26 @@ function sortBySuit(cards: readonly Card[], trumpSuit: Suit): Card[] {
   return [...grouped, ...trumps];
 }
 
-function Hand({
-  cards,
-  trumpSuit,
-  legalMoves,
-  sortMode,
-  onCardClick,
-  fromTableKeys,
-}: Props) {
+function Hand({ cards, trumpSuit, legalMoves, sortMode, onCardClick }: Props) {
   const sorted = sortMode === 'suit'
     ? sortBySuit(cards, trumpSuit)
     : sortByRank(cards, trumpSuit);
 
   return (
     <div className="hand">
-      {/* AnimatePresence keeps unmounting cards alive long enough for
-          their layoutId animation to play out (e.g., when a card is
-          played to the table and re-mounts there). */}
-      <AnimatePresence>
-        {sorted.map((card, index) => {
-          const key = cardKey(card);
-          const isLegal = legalMoves.byCard.has(key);
-          return (
-            <DraggableCard
-              key={key}
-              card={card}
-              isTrump={card.suit === trumpSuit}
-              isLegal={isLegal}
-              onClick={() => onCardClick(card)}
-              dealIndex={index}
-              fromTable={fromTableKeys?.has(key) ?? false}
-            />
-          );
-        })}
-      </AnimatePresence>
+      {sorted.map((card) => {
+        const key = cardKey(card);
+        const isLegal = legalMoves.byCard.has(key);
+        return (
+          <DraggableCard
+            key={key}
+            card={card}
+            isTrump={card.suit === trumpSuit}
+            isLegal={isLegal}
+            onClick={() => onCardClick(card)}
+          />
+        );
+      })}
     </div>
   );
 }

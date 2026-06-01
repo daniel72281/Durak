@@ -1,8 +1,6 @@
 import { useDroppable } from '@dnd-kit/core';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import type { Card, Suit, TablePair } from '@shared/types';
-import { cardKey } from '../utils/legalMoves';
 import CardSvg from './CardSvg';
 import DeckStack from './DeckStack';
 import './Table.css';
@@ -36,25 +34,14 @@ function PairDroppable({
       ref={setNodeRef}
       className={`pair ${canDefend ? 'droppable' : ''} ${isOver ? 'drop-target-active' : ''}`}
     >
-      {/* layoutId matches the one DraggableCard uses in the hand so
-          framer-motion animates the same card flying from hand→table
-          (and back, if the defender takes the pile). */}
-      <motion.div
-        className="attack-slot"
-        layoutId={`card:${cardKey(pair.attack)}`}
-      >
+      <div className="attack-slot">
         <CardSvg card={pair.attack} isTrump={pair.attack.suit === trumpSuit} />
-      </motion.div>
-      <AnimatePresence>
-        {pair.defense && (
-          <motion.div
-            className="defense-overlay"
-            layoutId={`card:${cardKey(pair.defense)}`}
-          >
-            <CardSvg card={pair.defense} isTrump={pair.defense.suit === trumpSuit} />
-          </motion.div>
-        )}
-      </AnimatePresence>
+      </div>
+      {pair.defense && (
+        <div className="defense-overlay">
+          <CardSvg card={pair.defense} isTrump={pair.defense.suit === trumpSuit} />
+        </div>
+      )}
     </div>
   );
 }
