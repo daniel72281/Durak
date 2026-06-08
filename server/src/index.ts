@@ -99,14 +99,17 @@ function commitScoreIfFinished(room: rooms.Room): void {
     room.scoredCurrentGame = true;
     return;
   }
+  // Points: winner (first to empty their hand) +2, durak 0, everyone
+  // else +1. On a draw (loser === null) the first to finish still gets
+  // the +2 since they "won" the race; the rest get +1.
   const loserId = room.game.loser;
+  const winnerId = room.game.outOrder[0] ?? null;
   for (const p of room.players) {
-    const score = room.scoreboard.get(p.id) ?? { wins: 0, duraks: 0 };
-    if (p.id === loserId) {
-      room.scoreboard.set(p.id, { wins: score.wins, duraks: score.duraks + 1 });
-    } else {
-      room.scoreboard.set(p.id, { wins: score.wins + 1, duraks: score.duraks });
-    }
+    const score = room.scoreboard.get(p.id) ?? { points: 0 };
+    let delta = 1;
+    if (p.id === winnerId) delta = 2;
+    else if (p.id === loserId) delta = 0;
+    room.scoreboard.set(p.id, { points: score.points + delta });
   }
   room.scoredCurrentGame = true;
 }

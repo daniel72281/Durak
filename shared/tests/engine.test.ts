@@ -458,6 +458,69 @@ describe('applyAction: defend', () => {
     });
     expect(r.ok).toBe(false);
   });
+
+  it('auto-completes the round when the last defense fills the attack cap', () => {
+    // 3 players, defender (p1) started the round with 2 cards. One pair
+    // is already defended; the second is pending. Once p1 beats it the
+    // table is full (2 pairs = cap 2), so the round must clear without
+    // waiting on attackers to "done attacking".
+    const kingH = card('K', 'hearts');
+    const state = makeState({
+      players: [
+        player('p0', [card('A', 'clubs')]),
+        player('p1', [kingH]),
+        player('p2', [card('J', 'clubs')]),
+      ],
+      attackerIndex: 0,
+      defenderIndex: 1,
+      table: [
+        pair(card('8', 'spades'), card('9', 'spades')),
+        pair(card('7', 'hearts')),
+      ],
+      roundAttackLimit: 5,
+      defenderRoundStartHandSize: 2,
+    });
+    const result = unwrap(
+      applyAction(state, {
+        type: 'defend',
+        playerId: 'p1',
+        pairIndex: 1,
+        card: kingH,
+      }),
+    );
+    // Table cleared = completeRound was invoked.
+    expect(result.table).toEqual([]);
+    expect(result.passedPlayerIds).toEqual([]);
+    expect(result.defenderTaking).toBe(false);
+  });
+
+  it('does NOT auto-complete when more attacks are still allowed', () => {
+    // Cap is 6 attacks but only one defended pair exists, so attackers
+    // could still throw in more — the round stays open.
+    const kingH = card('K', 'hearts');
+    const state = makeState({
+      players: [
+        player('p0', [card('A', 'clubs')]),
+        player('p1', [kingH]),
+        player('p2', [card('J', 'clubs')]),
+      ],
+      attackerIndex: 0,
+      defenderIndex: 1,
+      table: [pair(card('7', 'hearts'))],
+      roundAttackLimit: 6,
+      defenderRoundStartHandSize: 6,
+    });
+    const result = unwrap(
+      applyAction(state, {
+        type: 'defend',
+        playerId: 'p1',
+        pairIndex: 0,
+        card: kingH,
+      }),
+    );
+    expect(result.table).toHaveLength(1);
+    expect(result.table[0]!.defense).toEqual(kingH);
+  });
 });
 
 // ---------------------------------------------------------------------------

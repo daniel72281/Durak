@@ -68,25 +68,31 @@ function GameOverDialog({ state, isOwner, onPlayAgain, onBackHome }: Props) {
 
         <section className="scoreboard">
           <h3>{t('game.cumulative_scores')}</h3>
+          <p className="score-explainer">{t('game.score_explainer')}</p>
           <table>
             <thead>
               <tr>
                 <th>{t('game.player')}</th>
-                <th>{t('game.wins')}</th>
-                <th>{t('game.duraks_count')}</th>
+                <th>{t('game.points')}</th>
               </tr>
             </thead>
             <tbody>
-              {state.players.map((p) => {
-                const s = state.scoreboard[p.id] ?? { wins: 0, duraks: 0 };
-                return (
-                  <tr key={p.id} className={p.id === myId ? 'me' : ''}>
-                    <td>{p.nickname}</td>
-                    <td>{s.wins}</td>
-                    <td>{s.duraks}</td>
-                  </tr>
-                );
-              })}
+              {state.players
+                .slice()
+                .sort((a, b) => {
+                  const ap = state.scoreboard[a.id]?.points ?? 0;
+                  const bp = state.scoreboard[b.id]?.points ?? 0;
+                  return bp - ap;
+                })
+                .map((p) => {
+                  const s = state.scoreboard[p.id] ?? { points: 0 };
+                  return (
+                    <tr key={p.id} className={p.id === myId ? 'me' : ''}>
+                      <td>{p.nickname}</td>
+                      <td>{s.points}</td>
+                    </tr>
+                  );
+                })}
             </tbody>
           </table>
         </section>

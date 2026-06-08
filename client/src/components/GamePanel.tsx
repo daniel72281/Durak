@@ -22,7 +22,10 @@ import './GamePanel.css';
 interface Props {
   state: ClientGameState;
   onAction: (action: Action) => void;
-  onShowError: (message: string) => void;
+  // Optional durationMs lets a caller pin the message on screen longer
+  // than the default — used for the defend-vs-transfer disambiguation
+  // hint where players need a moment to actually read the choice.
+  onShowError: (message: string, durationMs?: number) => void;
 }
 
 function GamePanel({ state, onAction, onShowError }: Props) {
@@ -42,11 +45,21 @@ function GamePanel({ state, onAction, onShowError }: Props) {
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 6 } }),
   );
 
-  // Click fallback: send the FIRST legal target's action.
+  // Click fallback: send the FIRST legal target's action — UNLESS the
+  // card has both a defend and a transfer target, in which case clicking
+  // would silently pick one for the player. Force them to drag in that
+  // case so the choice (defend on the attack vs. transfer to next seat)
+  // stays explicit.
   const handleCardClick = (card: Card) => {
     const entry = legalMoves.byCard.get(cardKey(card));
     if (!entry || entry.targets.length === 0) {
       onShowError(t('game.no_legal_action_for_card'));
+      return;
+    }
+    const canDefend = entry.targets.some((tg) => tg.kind === 'defend');
+    const canTransfer = entry.targets.some((tg) => tg.kind === 'transfer');
+    if (canDefend && canTransfer) {
+      onShowError(t('game.ambiguous_defend_transfer'), 6000);
       return;
     }
     onAction(actionForTarget(card, entry.targets[0]!));
@@ -97,8 +110,15 @@ function GamePanel({ state, onAction, onShowError }: Props) {
   };
 
   // Action button visibility
-  const canTake = isDefender && state.table.length > 0 && !state.defenderTaking && !isOut;
   const fullyDefended = tableIsFullyDefended(state.table);
+  // Hide "take" once every attack has been answered — taking after a
+  // successful defense isn't a real choice in the rules.
+  const canTake =
+    isDefender &&
+    state.table.length > 0 &&
+    !state.defenderTaking &&
+    !fullyDefended &&
+    !isOut;
   const haveIPassed = state.passedPlayerIds.includes(myId);
   const canPass =
     !isDefender &&
@@ -140,19 +160,18 @@ function GamePanel({ state, onAction, onShowError }: Props) {
           <TurnTimer deadline={state.turnDeadline} />
         </div>
 
-        {!isOut && (() => {
-          // Banner priority:
-          //   1. defender → "Defend!"
-          //   2. official attacker on an empty table → "Attack X"
-          //   3. any non-defender who already passed but the round is still
-          //      open → "Waiting for other players…"
-          //   4. any non-defender with a legal card → "You can throw in on X"
-          //   (otherwise no banner — nothing useful to say)
+        {(() => {
+          // Banner priority — picked in order so the most actionable
+          // message wins. The last branch is a spectator-style message
+          // shown to everyone who isn't actively attacking/defending,
+          // so the current attacker/defender pair is always visible
+          // (also handles `isOut` and post-transfer states naturally,
+          // since attackerIndex/defenderIndex update in the engine).
           if (isDefender) {
             return <div className="role-banner">{t('game.you_are_defender')}</div>;
           }
           const isOfficialAttacker = state.selfIndex === state.attackerIndex;
-          if (isOfficialAttacker && state.table.length === 0) {
+          if (isOfficialAttacker && !isOut) {
             return (
               <div className="role-banner">
                 {t('game.you_are_attacker', { defender: defenderName })}
@@ -166,14 +185,24 @@ function GamePanel({ state, onAction, onShowError }: Props) {
               </div>
             );
           }
-          if (legalMoves.anyLegal && state.table.length > 0) {
+          if (!isOut && legalMoves.anyLegal && state.table.length > 0) {
             return (
               <div className="role-banner">
                 {t('game.you_can_throw_in', { defender: defenderName })}
               </div>
             );
           }
-          return null;
+          // Spectator fallback — show who is currently attacking whom.
+          const attackerName =
+            state.players[state.attackerIndex]?.nickname ?? '?';
+          return (
+            <div className="role-banner role-banner--muted">
+              {t('game.spectator_attacks', {
+                attacker: attackerName,
+                defender: defenderName,
+              })}
+            </div>
+          );
         })()}
 
         <Table

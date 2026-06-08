@@ -58,7 +58,14 @@ function RoomPage() {
   const [timedOut, setTimedOut] = useState(false);
   const [showLeave, setShowLeave] = useState(false);
   const [showClose, setShowClose] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  // Toast state carries an optional per-message duration so callers can
+  // request a longer dwell time when the message is something the player
+  // actually needs to read (e.g. the defend-vs-transfer disambiguation).
+  const [toast, setToast] = useState<{ text: string; durationMs?: number } | null>(null);
+  const showToast = (text: string, durationMs?: number) =>
+    setToast({ text, durationMs });
+  const setToastMessage = (text: string | null) =>
+    setToast(text === null ? null : { text });
   const hasJoinedRef = useRef(false);
 
   useEffect(() => {
@@ -227,7 +234,7 @@ function RoomPage() {
         <GamePanel
           state={gameState}
           onAction={handleGameAction}
-          onShowError={setToastMessage}
+          onShowError={showToast}
         />
         <div className="in-game-actions">
           <button
@@ -264,7 +271,11 @@ function RoomPage() {
           onConfirm={confirmLeave}
           onCancel={() => setShowLeave(false)}
         />
-        <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />
+        <Toast
+          message={toast?.text ?? null}
+          durationMs={toast?.durationMs}
+          onDismiss={() => setToast(null)}
+        />
       </>
     );
   }
@@ -355,7 +366,11 @@ function RoomPage() {
         onConfirm={confirmClose}
         onCancel={() => setShowClose(false)}
       />
-      <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />
+      <Toast
+        message={toast?.text ?? null}
+        durationMs={toast?.durationMs}
+        onDismiss={() => setToast(null)}
+      />
     </div>
   );
 }

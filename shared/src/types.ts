@@ -92,8 +92,14 @@ export interface PublicPlayer {
 }
 
 export interface PlayerScore {
-  wins: number;   // games this player finished WITHOUT being the durak
-  duraks: number; // games this player ended as the durak (loser)
+  // Cumulative points across all games played in this room.
+  // Scoring per game:
+  //   - first to empty their hand (outOrder[0]) → +2
+  //   - middle finishers → +1
+  //   - durak (loser) → 0
+  // A draw (loser === null) still credits outOrder[0] with +2; the rest
+  // get +1 since no one is the durak.
+  points: number;
 }
 
 export interface ClientGameState {

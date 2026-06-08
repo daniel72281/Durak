@@ -23,7 +23,7 @@ export interface Room {
   maxPlayers: number;
   players: RoomPlayer[];
   game: GameState | null;
-  // Cumulative wins/duraks per playerId across all games played in the room.
+  // Cumulative points per playerId across all games played in the room.
   scoreboard: Map<string, PlayerScore>;
   // Tracks whether the most recently finished game has already been scored
   // (to avoid double-counting if multiple events touch the same final state).
@@ -87,7 +87,7 @@ export function createRoom(
       disconnectedAt: null,
     }],
     game: null,
-    scoreboard: new Map([[playerId, { wins: 0, duraks: 0 }]]),
+    scoreboard: new Map([[playerId, { points: 0 }]]),
     scoredCurrentGame: false,
     disconnectTimers: new Map(),
   });
@@ -125,7 +125,7 @@ export function joinRoom(
     disconnected: false,
     disconnectedAt: null,
   });
-  room.scoreboard.set(playerId, { wins: 0, duraks: 0 });
+  room.scoreboard.set(playerId, { points: 0 });
   playerToRoom.set(playerId, roomId);
   return { ok: true, playerId, roomId };
 }

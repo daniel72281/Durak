@@ -319,12 +319,26 @@ function handleDefend(
   const newTable = state.table.map((p, i) =>
     i === action.pairIndex ? { ...p, defense: action.card } : p,
   );
-  return ok({
+  const updated: GameState = {
     ...state,
     players: newPlayers,
     table: newTable,
     passedPlayerIds: [],
-  });
+  };
+
+  // Auto-complete the round when the defender has answered every attack
+  // AND no more attacks can be added (round cap or defender-hand cap
+  // already reached). In that situation waiting on the non-defenders to
+  // press "done attacking" is pure ceremony — no card they hold could be
+  // accepted anyway, so we end the round immediately.
+  const effectiveCap = Math.min(
+    state.roundAttackLimit,
+    state.defenderRoundStartHandSize,
+  );
+  if (tableIsFullyDefended(newTable) && newTable.length >= effectiveCap) {
+    return ok(completeRound(updated));
+  }
+  return ok(updated);
 }
 
 function handleTransfer(
