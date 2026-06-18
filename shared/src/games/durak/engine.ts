@@ -8,13 +8,8 @@
 // Every function returns a NEW state; never mutates inputs. Invalid actions
 // return { ok: false, error } so the server can log/respond without crashing.
 
-import {
-  type Action,
-  type Card,
-  type GameState,
-  type Player,
-  type Suit,
-} from './types';
+import type { Card, Player, Suit } from '../../types';
+import type { Action, GameState } from './types';
 import {
   beats,
   canAttackCard,
@@ -24,7 +19,7 @@ import {
   nextActivePlayerIndex,
   tableIsFullyDefended,
 } from './rules';
-import { dealInitial, drawFromTop } from './deck';
+import { dealInitial, drawFromTop } from '../../deck';
 
 export interface EngineSuccess {
   ok: true;

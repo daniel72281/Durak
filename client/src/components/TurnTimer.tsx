@@ -25,7 +25,7 @@ function TurnTimer({ deadline }: Props) {
     <div
       className={`turn-timer ${urgent ? 'urgent' : ''}`}
       role="timer"
-      aria-label={t('game.turn_timer_label', { seconds: remaining })}
+      aria-label={t('common.turn_timer_label', { seconds: remaining })}
     >
       ⏱ {remaining}s
     </div>

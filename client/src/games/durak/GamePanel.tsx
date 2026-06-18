@@ -8,15 +8,16 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core';
 import { useTranslation } from 'react-i18next';
-import type { Action, Card, ClientGameState } from '@shared/types';
-import { tableIsFullyDefended } from '@shared/rules';
+import type { Card } from '@shared/types';
+import type { Action, ClientGameState } from '@shared/games/durak';
+import { tableIsFullyDefended } from '@shared/games/durak';
 import Hand, { type SortMode } from './Hand';
 import Table from './Table';
-import PlayerList from './PlayerList';
+import PlayerList from '../../components/PlayerList';
 import ActionButtons from './ActionButtons';
-import TurnTimer from './TurnTimer';
+import TurnTimer from '../../components/TurnTimer';
 import SortToggle from './SortToggle';
-import { computeLegalMoves, cardKey } from '../utils/legalMoves';
+import { computeLegalMoves, cardKey } from './legalMoves';
 import './GamePanel.css';
 
 interface Props {
@@ -53,13 +54,13 @@ function GamePanel({ state, onAction, onShowError }: Props) {
   const handleCardClick = (card: Card) => {
     const entry = legalMoves.byCard.get(cardKey(card));
     if (!entry || entry.targets.length === 0) {
-      onShowError(t('game.no_legal_action_for_card'));
+      onShowError(t('games.durak.no_legal_action_for_card'));
       return;
     }
     const canDefend = entry.targets.some((tg) => tg.kind === 'defend');
     const canTransfer = entry.targets.some((tg) => tg.kind === 'transfer');
     if (canDefend && canTransfer) {
-      onShowError(t('game.ambiguous_defend_transfer'), 6000);
+      onShowError(t('games.durak.ambiguous_defend_transfer'), 6000);
       return;
     }
     onAction(actionForTarget(card, entry.targets[0]!));
@@ -82,19 +83,19 @@ function GamePanel({ state, onAction, onShowError }: Props) {
 
     const entry = legalMoves.byCard.get(cardKey(card));
     if (!entry) {
-      onShowError(t('game.no_legal_action_for_card'));
+      onShowError(t('games.durak.no_legal_action_for_card'));
       return;
     }
 
     if (overId === 'target:attack') {
       const t1 = entry.targets.find((tg) => tg.kind === 'attack');
-      if (!t1) return onShowError(t('game.no_legal_action_for_card'));
+      if (!t1) return onShowError(t('games.durak.no_legal_action_for_card'));
       onAction({ type: 'attack', playerId: myId, card });
       return;
     }
     if (overId === 'target:transfer') {
       const t1 = entry.targets.find((tg) => tg.kind === 'transfer');
-      if (!t1) return onShowError(t('game.no_legal_action_for_card'));
+      if (!t1) return onShowError(t('games.durak.no_legal_action_for_card'));
       onAction({ type: 'transfer', playerId: myId, card });
       return;
     }
@@ -103,7 +104,7 @@ function GamePanel({ state, onAction, onShowError }: Props) {
       const t1 = entry.targets.find(
         (tg) => tg.kind === 'defend' && tg.pairIndex === pairIndex,
       );
-      if (!t1) return onShowError(t('game.no_legal_action_for_card'));
+      if (!t1) return onShowError(t('games.durak.no_legal_action_for_card'));
       onAction({ type: 'defend', playerId: myId, pairIndex, card });
       return;
     }
@@ -173,27 +174,27 @@ function GamePanel({ state, onAction, onShowError }: Props) {
           // (also handles `isOut` and post-transfer states naturally,
           // since attackerIndex/defenderIndex update in the engine).
           if (isDefender) {
-            return <div className="role-banner">{t('game.you_are_defender')}</div>;
+            return <div className="role-banner">{t('games.durak.you_are_defender')}</div>;
           }
           const isOfficialAttacker = state.selfIndex === state.attackerIndex;
           if (isOfficialAttacker && !isOut) {
             return (
               <div className="role-banner">
-                {t('game.you_are_attacker', { defender: defenderName })}
+                {t('games.durak.you_are_attacker', { defender: defenderName })}
               </div>
             );
           }
           if (haveIPassed && state.table.length > 0) {
             return (
               <div className="role-banner role-banner--muted">
-                {t('game.waiting_for_others')}
+                {t('games.durak.waiting_for_others')}
               </div>
             );
           }
           if (!isOut && legalMoves.anyLegal && state.table.length > 0) {
             return (
               <div className="role-banner">
-                {t('game.you_can_throw_in', { defender: defenderName })}
+                {t('games.durak.you_can_throw_in', { defender: defenderName })}
               </div>
             );
           }
@@ -202,7 +203,7 @@ function GamePanel({ state, onAction, onShowError }: Props) {
             state.players[state.attackerIndex]?.nickname ?? '?';
           return (
             <div className="role-banner role-banner--muted">
-              {t('game.spectator_attacks', {
+              {t('games.durak.spectator_attacks', {
                 attacker: attackerName,
                 defender: defenderName,
               })}
@@ -230,7 +231,7 @@ function GamePanel({ state, onAction, onShowError }: Props) {
         {state.selfHand.length > 0 && (
           <div className="hand-section">
             <div className="hand-section-header">
-              <span className="hand-label">{t('game.your_hand')}</span>
+              <span className="hand-label">{t('games.durak.your_hand')}</span>
               <SortToggle
                 mode={sortMode}
                 onToggle={() =>

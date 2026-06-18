@@ -1,7 +1,8 @@
 // Wire protocol — typed Socket.IO event maps shared between client and server.
 // Both sides import these types to keep payloads in sync.
 
-import type { Action, ClientGameState, PublicPlayer } from './types';
+import type { PublicPlayer } from './types';
+import type { Action, ClientGameState } from './games/durak';
 
 // Marker type for events that carry no extra payload (other than ok flag).
 export type EmptyPayload = Record<string, never>;

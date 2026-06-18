@@ -1,8 +1,9 @@
 import { useDroppable } from '@dnd-kit/core';
 import { useTranslation } from 'react-i18next';
-import type { Card, Suit, TablePair } from '@shared/types';
-import CardSvg from './CardSvg';
-import DeckStack from './DeckStack';
+import type { Card, Suit } from '@shared/types';
+import type { TablePair } from '@shared/games/durak';
+import CardSvg from '../../components/CardSvg';
+import DeckStack from '../../components/DeckStack';
 import './Table.css';
 
 interface Props {
@@ -51,7 +52,7 @@ function AttackZone() {
   const { isOver, setNodeRef } = useDroppable({ id: 'target:attack' });
   return (
     <div ref={setNodeRef} className={`attack-zone ${isOver ? 'active' : ''}`}>
-      {t('game.attack_drop_zone')}
+      {t('games.durak.attack_drop_zone')}
     </div>
   );
 }
@@ -61,7 +62,7 @@ function TransferZone() {
   const { isOver, setNodeRef } = useDroppable({ id: 'target:transfer' });
   return (
     <div ref={setNodeRef} className={`transfer-zone ${isOver ? 'active' : ''}`}>
-      {t('game.transfer_drop_zone')}
+      {t('games.durak.transfer_drop_zone')}
     </div>
   );
 }

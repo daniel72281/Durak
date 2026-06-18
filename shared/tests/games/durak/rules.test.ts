@@ -10,8 +10,9 @@ import {
   rankIsOnTable,
   rankValue,
   tableIsFullyDefended,
-} from '../src/rules';
-import type { Card, Player, TablePair, Suit } from '../src/types';
+} from '../../../src/games/durak/rules';
+import type { Card, Player, Suit } from '../../../src/types';
+import type { TablePair } from '../../../src/games/durak/types';
 
 const c = (rank: Card['rank'], suit: Card['suit']): Card => ({ rank, suit });
 const pair = (attack: Card, defense?: Card): TablePair => ({ attack, defense });

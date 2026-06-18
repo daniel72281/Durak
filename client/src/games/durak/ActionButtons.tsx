@@ -15,12 +15,12 @@ function ActionButtons({ canTake, canPass, onTake, onPass }: Props) {
     <div className="action-buttons">
       {canTake && (
         <button type="button" className="primary" onClick={onTake}>
-          {t('game.take')}
+          {t('games.durak.take')}
         </button>
       )}
       {canPass && (
         <button type="button" className="primary" onClick={onPass}>
-          {t('game.pass')}
+          {t('games.durak.pass')}
         </button>
       )}
     </div>

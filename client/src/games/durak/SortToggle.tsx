@@ -11,7 +11,7 @@ function SortToggle({ mode, onToggle }: Props) {
   const { t } = useTranslation();
   return (
     <button type="button" className="sort-toggle" onClick={onToggle}>
-      {mode === 'rank' ? t('game.sort_by_rank') : t('game.sort_by_suit')}
+      {mode === 'rank' ? t('games.durak.sort_by_rank') : t('games.durak.sort_by_suit')}
     </button>
   );
 }

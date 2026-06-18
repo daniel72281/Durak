@@ -1,7 +1,7 @@
 import type { Card, Suit } from '@shared/types';
-import { rankValue } from '@shared/rules';
-import DraggableCard from './DraggableCard';
-import { cardKey, type LegalMoves } from '../utils/legalMoves';
+import { rankValue } from '@shared/games/durak';
+import DraggableCard from '../../components/DraggableCard';
+import { cardKey, type LegalMoves } from './legalMoves';
 import './Hand.css';
 
 export type SortMode = 'rank' | 'suit';

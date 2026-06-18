@@ -6,9 +6,9 @@ import {
   type Card,
   type Suit,
   type Player,
-  type TablePair,
   RANKS_IN_ORDER,
-} from './types';
+} from '../../types';
+import type { TablePair } from './types';
 
 // Numeric value for rank comparison. 6 → 0, A → 8.
 export function rankValue(rank: Card['rank']): number {

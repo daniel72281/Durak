@@ -4,7 +4,8 @@
 // Each room tracks its owner, max player count, list of joined players, and
 // (later, in stage 2) the running GameState.
 
-import type { GameState, PlayerScore } from '../../shared/src/types';
+import type { PlayerScore } from '../../shared/src/types';
+import type { GameState } from '../../shared/src/games/durak';
 
 interface RoomPlayer {
   id: string;

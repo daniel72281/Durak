@@ -6,9 +6,10 @@ import {
   findFirstAttackerForNewGame,
   type EngineSuccess,
   type EngineResult,
-} from '../src/engine';
-import type { Card, GameState, Player, Suit, TablePair } from '../src/types';
-import { createDeck, shuffle } from '../src/deck';
+} from '../../../src/games/durak/engine';
+import type { Card, Player, Suit } from '../../../src/types';
+import type { GameState, TablePair } from '../../../src/games/durak/types';
+import { createDeck, shuffle } from '../../../src/deck';
 
 const card = (rank: Card['rank'], suit: Card['suit']): Card => ({ rank, suit });
 const pair = (attack: Card, defense?: Card): TablePair => ({ attack, defense });

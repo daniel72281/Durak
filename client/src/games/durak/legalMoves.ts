@@ -2,13 +2,17 @@
 // and what drop targets each card can be dropped on. Uses the shared rules
 // directly so the UI hint stays consistent with the server's validation.
 
-import type { Card, ClientGameState } from '@shared/types';
+import type { ClientGameState } from '@shared/games/durak';
 import {
   beats,
   canAttackCard,
   canTransfer,
   tableIsFullyDefended,
-} from '@shared/rules';
+} from '@shared/games/durak';
+import { cardKey } from '../../utils/cardKey';
+
+// Re-exported for callers that already import from this barrel.
+export { cardKey };
 
 export type DropTargetKind =
   | { kind: 'attack' } // central attack/throw-in zone
@@ -25,10 +29,6 @@ export interface LegalMoves {
   byCard: Map<string, LegalMovesForCard>;
   // Convenience: any card legal at all?
   anyLegal: boolean;
-}
-
-export function cardKey(card: Card): string {
-  return `${card.suit}-${card.rank}`;
 }
 
 export function computeLegalMoves(state: ClientGameState): LegalMoves {

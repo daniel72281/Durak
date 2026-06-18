@@ -1,6 +1,6 @@
 import { useDraggable } from '@dnd-kit/core';
 import type { Card } from '@shared/types';
-import { cardKey } from '../utils/legalMoves';
+import { cardKey } from '../utils/cardKey';
 import CardSvg from './CardSvg';
 import './DraggableCard.css';
 

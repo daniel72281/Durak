@@ -8,10 +8,11 @@ import type {
   RoomStatePayload,
   ServerToClientEvents,
 } from '../../shared/src/wire';
-import { applyAction, createGame, startGame } from '../../shared/src/engine';
+import { applyAction, createGame, startGame } from '../../shared/src/games/durak';
+import { computeScoreDeltas } from '../../shared/src/games/durak/scoring';
 import { createDeck, shuffle } from '../../shared/src/deck';
 import * as rooms from './rooms';
-import { filterGameState } from './state-filter';
+import { filterGameState } from '../../shared/src/games/durak/stateFilter';
 import {
   applyExpiryAction,
   clearTurnTimer,
@@ -89,26 +90,20 @@ function closeRoomWithReason(roomId: string, reason: RoomClosedReason): void {
 
 // Updates the per-room scoreboard with the just-finished game's result.
 // Idempotent via room.scoredCurrentGame so we don't double-count if
-// multiple events touch the same final state.
+// multiple events touch the same final state. The per-game scoring rule
+// (who gets how many points) lives in games/<g>/scoring.ts so this
+// function stays game-agnostic.
 function commitScoreIfFinished(room: rooms.Room): void {
   if (!room.game || room.game.phase !== 'finished') return;
   if (room.scoredCurrentGame) return;
-  // Games that ended because a player disconnected don't count — the user
-  // asked that the scoreboard stay unchanged in that case.
-  if (room.game.endReason === 'player_disconnected') {
-    room.scoredCurrentGame = true;
-    return;
-  }
-  // Points: winner (first to empty their hand) +2, durak 0, everyone
-  // else +1. On a draw (loser === null) the first to finish still gets
-  // the +2 since they "won" the race; the rest get +1.
-  const loserId = room.game.loser;
-  const winnerId = room.game.outOrder[0] ?? null;
+  const deltas = computeScoreDeltas(room.game);
+  // An empty deltas map means the game ended in a way that shouldn't
+  // touch the scoreboard (e.g. 'player_disconnected'). Still mark scored
+  // so subsequent events for the same final state are no-ops.
   for (const p of room.players) {
+    const delta = deltas.get(p.id);
+    if (delta === undefined) continue;
     const score = room.scoreboard.get(p.id) ?? { points: 0 };
-    let delta = 1;
-    if (p.id === winnerId) delta = 2;
-    else if (p.id === loserId) delta = 0;
     room.scoreboard.set(p.id, { points: score.points + delta });
   }
   room.scoredCurrentGame = true;

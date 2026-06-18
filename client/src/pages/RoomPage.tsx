@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { RoomClosedReason, RoomStatePayload } from '@shared/wire';
-import type { Action, ClientGameState } from '@shared/types';
+import type { Action, ClientGameState } from '@shared/games/durak';
 import {
   socket,
   getLatestRoomState,
@@ -11,8 +11,8 @@ import {
   clearRoomCache,
 } from '../socket';
 import ConfirmDialog from '../components/ConfirmDialog';
-import GamePanel from '../components/GamePanel';
-import GameOverDialog from '../components/GameOverDialog';
+import GamePanel from '../games/durak/GamePanel';
+import GameOverDialog from '../games/durak/GameOverDialog';
 import Toast from '../components/Toast';
 import { clearSession, loadSession } from '../lib/session';
 import './RoomPage.css';
@@ -119,11 +119,11 @@ function RoomPage() {
       const nickname =
         gameState?.players[gameState.attackerIndex]?.nickname ?? '?';
       if (reason === 'six_of_trumps') {
-        setToastMessage(t('game.first_attacker_six_of_trumps', { nickname }));
+        setToastMessage(t('games.durak.first_attacker_six_of_trumps', { nickname }));
       } else if (reason === 'previous_winner') {
-        setToastMessage(t('game.first_attacker_previous_winner', { nickname }));
+        setToastMessage(t('games.durak.first_attacker_previous_winner', { nickname }));
       } else {
-        setToastMessage(t('game.first_attacker_random'));
+        setToastMessage(t('games.durak.first_attacker_random'));
       }
     }
     prevReasonRef.current = reason;

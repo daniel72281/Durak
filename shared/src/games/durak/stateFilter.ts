@@ -2,12 +2,8 @@
 // ClientGameState that's safe to broadcast. Hides other players' hands
 // (they're collapsed to handCount) so secrets never leak over the socket.
 
-import type {
-  ClientGameState,
-  GameState,
-  PlayerScore,
-  PublicPlayer,
-} from '../../shared/src/types';
+import type { PlayerScore, PublicPlayer } from '../../types';
+import type { ClientGameState, GameState } from './types';
 
 export function filterGameState(
   state: GameState,

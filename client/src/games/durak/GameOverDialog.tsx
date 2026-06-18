@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import type { ClientGameState } from '@shared/types';
+import type { ClientGameState } from '@shared/games/durak';
 import './GameOverDialog.css';
 
 interface Props {
@@ -31,26 +31,26 @@ function GameOverDialog({ state, isOwner, onPlayAgain, onBackHome }: Props) {
   return (
     <div className="game-over-backdrop">
       <div className="game-over-dialog">
-        <h2>{t('game.game_over')}</h2>
+        <h2>{t('games.durak.game_over')}</h2>
 
         {state.endReason === 'player_disconnected' ? (
-          <p className="game-over-result">{t('game.ended_player_disconnected')}</p>
+          <p className="game-over-result">{t('games.durak.ended_player_disconnected')}</p>
         ) : state.loser ? (
           <p className="game-over-result">
             {state.loser === myId
-              ? t('game.you_are_durak')
-              : t('game.someone_is_durak', {
+              ? t('games.durak.you_are_durak')
+              : t('games.durak.someone_is_durak', {
                   nickname:
                     state.players.find((p) => p.id === state.loser)?.nickname ?? '?',
                 })}
           </p>
         ) : (
-          <p className="game-over-result">{t('game.draw')}</p>
+          <p className="game-over-result">{t('games.durak.draw')}</p>
         )}
 
         {state.endReason !== 'player_disconnected' && ranking.length > 0 && (
           <section className="ranking">
-            <h3>{t('game.this_game_ranking')}</h3>
+            <h3>{t('games.durak.this_game_ranking')}</h3>
             <ol className="ranking-list">
               {ranking.map((r) => (
                 <li
@@ -59,7 +59,7 @@ function GameOverDialog({ state, isOwner, onPlayAgain, onBackHome }: Props) {
                 >
                   <span className="place">{r.place}</span>
                   <span className="name">{r.nickname}</span>
-                  {r.isDurak && <span className="durak-tag">{t('game.durak_short')}</span>}
+                  {r.isDurak && <span className="durak-tag">{t('games.durak.durak_short')}</span>}
                 </li>
               ))}
             </ol>
@@ -67,13 +67,13 @@ function GameOverDialog({ state, isOwner, onPlayAgain, onBackHome }: Props) {
         )}
 
         <section className="scoreboard">
-          <h3>{t('game.cumulative_scores')}</h3>
-          <p className="score-explainer">{t('game.score_explainer')}</p>
+          <h3>{t('games.durak.cumulative_scores')}</h3>
+          <p className="score-explainer">{t('games.durak.score_explainer')}</p>
           <table>
             <thead>
               <tr>
-                <th>{t('game.player')}</th>
-                <th>{t('game.points')}</th>
+                <th>{t('games.durak.player')}</th>
+                <th>{t('games.durak.points')}</th>
               </tr>
             </thead>
             <tbody>
@@ -100,11 +100,11 @@ function GameOverDialog({ state, isOwner, onPlayAgain, onBackHome }: Props) {
         <div className="game-over-actions">
           {isOwner && (
             <button type="button" className="primary" onClick={onPlayAgain}>
-              {t('game.play_again')}
+              {t('games.durak.play_again')}
             </button>
           )}
           {!isOwner && (
-            <p className="waiting-restart">{t('game.waiting_for_restart')}</p>
+            <p className="waiting-restart">{t('games.durak.waiting_for_restart')}</p>
           )}
           <button type="button" className="danger" onClick={onBackHome}>
             {t('room.back_home')}

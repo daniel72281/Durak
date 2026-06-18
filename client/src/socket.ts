@@ -8,7 +8,7 @@ import type {
   RoomStatePayload,
   ServerToClientEvents,
 } from '@shared/wire';
-import type { ClientGameState } from '@shared/types';
+import type { ClientGameState } from '@shared/games/durak';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
 
