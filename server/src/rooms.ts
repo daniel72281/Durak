@@ -5,7 +5,7 @@
 // (later, in stage 2) the running GameState.
 
 import type { PlayerScore } from '../../shared/src/types';
-import type { GameState } from '../../shared/src/games/durak';
+import type { GameType } from '../../shared/src/games/common';
 
 interface RoomPlayer {
   id: string;
@@ -22,8 +22,14 @@ export interface Room {
   id: string;
   ownerId: string;
   maxPlayers: number;
+  // Which game this room is hosting. Determines which engine the server
+  // dispatches through (games[gameType]). Fixed at room creation.
+  gameType: GameType;
   players: RoomPlayer[];
-  game: GameState | null;
+  // The active game's state. Typed `unknown` because the shape varies per
+  // gameType — only the matching engine knows the real type. Callers
+  // either go through games[gameType].* or type-assert at the call site.
+  game: unknown | null;
   // Cumulative points per playerId across all games played in the room.
   scoreboard: Map<string, PlayerScore>;
   // Tracks whether the most recently finished game has already been scored
@@ -67,6 +73,7 @@ export type CreateResult =
 export function createRoom(
   nickname: string,
   maxPlayers: number,
+  gameType: GameType,
   socketId: string,
 ): CreateResult {
   const clean = sanitizeNickname(nickname);
@@ -80,6 +87,7 @@ export function createRoom(
     id: roomId,
     ownerId: playerId,
     maxPlayers,
+    gameType,
     players: [{
       id: playerId,
       nickname: clean,

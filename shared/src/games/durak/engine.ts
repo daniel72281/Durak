@@ -21,15 +21,18 @@ import {
 } from './rules';
 import { dealInitial, drawFromTop } from '../../deck';
 
-export interface EngineSuccess {
-  ok: true;
-  state: GameState;
-}
-export interface EngineError {
-  ok: false;
-  error: string;
-}
-export type EngineResult = EngineSuccess | EngineError;
+// Local aliases of the generic engine result types pinned to Durak's
+// GameState. Keeping them here lets the rest of engine.ts read like
+// it always did; multi-game callers should use EngineResult<S> from
+// shared/src/games/common.ts directly.
+import type {
+  EngineError as GenericEngineError,
+  EngineResult as GenericEngineResult,
+  EngineSuccess as GenericEngineSuccess,
+} from '../common';
+export type EngineSuccess = GenericEngineSuccess<GameState>;
+export type EngineError = GenericEngineError;
+export type EngineResult = GenericEngineResult<GameState>;
 
 const HAND_TARGET = 6;
 

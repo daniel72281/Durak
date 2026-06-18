@@ -22,7 +22,7 @@ function HomePage() {
       return;
     }
     setBusy(true);
-    socket.emit('room:create', { nickname: cleanNick, maxPlayers }, (ack) => {
+    socket.emit('room:create', { nickname: cleanNick, maxPlayers, gameType: 'durak' }, (ack) => {
       setBusy(false);
       if (!ack.ok) {
         setError(ack.error);

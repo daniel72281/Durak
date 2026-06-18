@@ -2,6 +2,7 @@
 // Both sides import these types to keep payloads in sync.
 
 import type { PublicPlayer } from './types';
+import type { GameType } from './games/common';
 import type { Action, ClientGameState } from './games/durak';
 
 // Marker type for events that carry no extra payload (other than ok flag).
@@ -19,6 +20,9 @@ export type AckResult<T extends object = EmptyPayload> = (
 export interface RoomCreatePayload {
   nickname: string;
   maxPlayers: number; // 2-5
+  // Which game this room will play. The server stores it on the room
+  // and dispatches engine calls through games[gameType].
+  gameType: GameType;
 }
 export interface RoomCreateAck {
   roomId: string;
@@ -51,6 +55,9 @@ export interface RoomStatePayload {
   isPlaying: boolean;
   // The receiving socket's own playerId, so the client can identify itself.
   selfPlayerId: string;
+  // Which game the room is hosting. Lets the client pick the right
+  // GamePanel without an extra round-trip.
+  gameType: GameType;
 }
 
 export type RoomClosedReason =

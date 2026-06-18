@@ -8,17 +8,22 @@ import type {
   RoomStatePayload,
   ServerToClientEvents,
 } from '../../shared/src/wire';
-import { applyAction, createGame, startGame } from '../../shared/src/games/durak';
-import { computeScoreDeltas } from '../../shared/src/games/durak/scoring';
-import { createDeck, shuffle } from '../../shared/src/deck';
+import { games, type GameEngine } from '../../shared/src/games/common';
 import * as rooms from './rooms';
-import { filterGameState } from '../../shared/src/games/durak/stateFilter';
 import {
-  applyExpiryAction,
   clearTurnTimer,
   getTurnDeadline,
   startTurnTimer,
 } from './turnTimer';
+
+// Single-game type erasure for the dispatcher. Each engine is independently
+// typed at its own callsite; the server holds rooms whose state shape varies
+// per gameType, so we widen at the boundary and trust the engine to validate
+// its own input. Cleaner than threading a union through every call.
+type AnyEngine = GameEngine<unknown, unknown, unknown>;
+function engineFor(room: rooms.Room): AnyEngine {
+  return games[room.gameType] as AnyEngine;
+}
 
 const PORT = Number(process.env.PORT) || 3002;
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
@@ -57,6 +62,7 @@ function broadcastRoomState(roomId: string): void {
       playerCount: room.players.length,
       isPlaying: room.game !== null,
       selfPlayerId: player.id,
+      gameType: room.gameType,
     };
     if (isOwner) {
       payload.players = room.players.map((p) => ({
@@ -94,12 +100,14 @@ function closeRoomWithReason(roomId: string, reason: RoomClosedReason): void {
 // (who gets how many points) lives in games/<g>/scoring.ts so this
 // function stays game-agnostic.
 function commitScoreIfFinished(room: rooms.Room): void {
-  if (!room.game || room.game.phase !== 'finished') return;
+  if (!room.game) return;
+  const engine = engineFor(room);
+  if (!engine.isFinished(room.game)) return;
   if (room.scoredCurrentGame) return;
-  const deltas = computeScoreDeltas(room.game);
+  const deltas = engine.computeScoreDeltas(room.game);
   // An empty deltas map means the game ended in a way that shouldn't
-  // touch the scoreboard (e.g. 'player_disconnected'). Still mark scored
-  // so subsequent events for the same final state are no-ops.
+  // touch the scoreboard (e.g. 'player_disconnected' in Durak). Still
+  // mark scored so subsequent events for the same final state are no-ops.
   for (const p of room.players) {
     const delta = deltas.get(p.id);
     if (delta === undefined) continue;
@@ -115,13 +123,14 @@ function broadcastGameState(roomId: string): void {
   const room = rooms.getRoom(roomId);
   if (!room || !room.game) return;
   commitScoreIfFinished(room);
+  const engine = engineFor(room);
   const deadline = getTurnDeadline(roomId);
   const disconnectedIds = new Set(
     room.players.filter((p) => p.disconnected).map((p) => p.id),
   );
   for (const player of room.players) {
     if (player.disconnected) continue;
-    const view = filterGameState(
+    const view = engine.filterForPlayer(
       room.game,
       player.id,
       room.id,
@@ -129,7 +138,7 @@ function broadcastGameState(roomId: string): void {
       room.scoreboard,
       disconnectedIds,
     );
-    io.to(player.socketId).emit('game:state', view);
+    io.to(player.socketId).emit('game:state', view as never);
   }
 }
 
@@ -138,16 +147,18 @@ function broadcastGameState(roomId: string): void {
 function handleTimerExpiry(roomId: string): void {
   const room = rooms.getRoom(roomId);
   if (!room || !room.game) return;
-  const { result, action } = applyExpiryAction(room.game);
+  const engine = engineFor(room);
+  const { result, action } = engine.applyExpiryAction(room.game);
   if (!result.ok) {
     console.log(`[timer] room=${roomId} expiry action failed: ${result.error}`);
     return;
   }
   if (action) {
-    console.log(`[timer] room=${roomId} auto-applied ${action.type}`);
+    const typed = action as { type?: string };
+    console.log(`[timer] room=${roomId} auto-applied ${typed.type ?? '<unknown>'}`);
   }
   room.game = result.state;
-  if (result.state.phase === 'playing') {
+  if (!engine.isFinished(result.state)) {
     startTurnTimer(roomId, () => handleTimerExpiry(roomId));
   } else {
     clearTurnTimer(roomId);
@@ -158,9 +169,12 @@ function handleTimerExpiry(roomId: string): void {
 io.on('connection', (socket) => {
   console.log(`[socket] connected: ${socket.id}`);
 
-  socket.on('room:create', ({ nickname, maxPlayers }, ack) => {
-    console.log(`[room:create] from ${socket.id}: nickname='${nickname}' max=${maxPlayers}`);
-    const result = rooms.createRoom(nickname, maxPlayers, socket.id);
+  socket.on('room:create', ({ nickname, maxPlayers, gameType }, ack) => {
+    console.log(`[room:create] from ${socket.id}: nickname='${nickname}' max=${maxPlayers} game=${gameType}`);
+    if (!(gameType in games)) {
+      return ack({ ok: false, error: `unknown gameType '${gameType}'` });
+    }
+    const result = rooms.createRoom(nickname, maxPlayers, gameType, socket.id);
     if (!result.ok) {
       console.log(`[room:create] failed: ${result.error}`);
       return ack({ ok: false, error: result.error });
@@ -223,7 +237,8 @@ io.on('connection', (socket) => {
     if (room.ownerId !== playerId) {
       return ack({ ok: false, error: 'only the owner can restart' });
     }
-    if (!room.game || room.game.phase !== 'finished') {
+    const engine = engineFor(room);
+    if (!room.game || !engine.isFinished(room.game)) {
       return ack({ ok: false, error: 'no finished game to restart' });
     }
     // Ensure final score from the just-finished game is committed before reset.
@@ -232,15 +247,22 @@ io.on('connection', (socket) => {
     // starter — walk outOrder from front to back, picking the first one
     // who's still in the room.
     let startPlayerId: string | null = null;
-    for (const pid of room.game.outOrder) {
+    for (const pid of engine.outOrder(room.game)) {
       if (room.players.some((p) => p.id === pid)) { startPlayerId = pid; break; }
     }
     try {
-      const initial = createGame(
+      const initial = engine.createGame(
         room.players.map((p) => ({ id: p.id, nickname: p.nickname })),
       );
-      const shuffled = shuffle(createDeck());
-      const result = startGame(initial, shuffled, { startPlayerId });
+      const shuffled = engine.buildShuffledDeck();
+      // startGame in Durak supports an options arg with startPlayerId.
+      // The generic GameEngine interface doesn't surface it (other games
+      // may pick a starter differently); pass it positionally via cast.
+      const result = (engine.startGame as (s: unknown, d: unknown, o?: { startPlayerId?: string | null }) => ReturnType<typeof engine.startGame>)(
+        initial,
+        shuffled,
+        { startPlayerId },
+      );
       if (!result.ok) return ack({ ok: false, error: result.error });
       room.game = result.state;
       room.scoredCurrentGame = false;
@@ -268,11 +290,12 @@ io.on('connection', (socket) => {
       return ack({ ok: false, error: 'need at least 2 players' });
     }
     try {
-      const initial = createGame(
+      const engine = engineFor(room);
+      const initial = engine.createGame(
         room.players.map((p) => ({ id: p.id, nickname: p.nickname })),
       );
-      const shuffled = shuffle(createDeck());
-      const result = startGame(initial, shuffled);
+      const shuffled = engine.buildShuffledDeck();
+      const result = engine.startGame(initial, shuffled);
       if (!result.ok) return ack({ ok: false, error: result.error });
       room.game = result.state;
       room.scoredCurrentGame = false;
@@ -294,13 +317,15 @@ io.on('connection', (socket) => {
       return ack({ ok: false, error: 'no active game' });
     }
     // Ensure the action's playerId matches the sender (no impersonation).
-    if (action.playerId !== playerId) {
+    const typedAction = action as { playerId?: string; type?: string };
+    if (typedAction.playerId !== playerId) {
       return ack({ ok: false, error: 'cannot act on behalf of another player' });
     }
-    const result = applyAction(room.game, action);
+    const engine = engineFor(room);
+    const result = engine.applyAction(room.game, action);
     if (!result.ok) return ack({ ok: false, error: result.error });
     room.game = result.state;
-    if (result.state.phase === 'playing') {
+    if (engine.isPlaying(result.state)) {
       startTurnTimer(room.id, () => handleTimerExpiry(room.id));
     } else {
       clearTurnTimer(room.id);
@@ -364,15 +389,13 @@ function handleDisconnectExpiry(roomId: string, playerId: string): void {
 
   // Non-owner left during a live game → end this game without a winner,
   // remove the player + their scoreboard entry, broadcast the final state.
-  if (room.game && room.game.phase === 'playing') {
-    room.game = {
-      ...room.game,
-      phase: 'finished',
-      loser: null,
-      endReason: 'player_disconnected',
-    };
-    clearTurnTimer(roomId);
-    room.scoredCurrentGame = true; // explicit: don't update wins/duraks
+  if (room.game) {
+    const engine = engineFor(room);
+    if (engine.isPlaying(room.game)) {
+      room.game = engine.abortGameDueToDisconnect(room.game);
+      clearTurnTimer(roomId);
+      room.scoredCurrentGame = true; // explicit: don't update wins/duraks
+    }
   }
 
   const result = rooms.evictPlayer(playerId);
