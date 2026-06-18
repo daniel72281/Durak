@@ -398,24 +398,34 @@ describe('applyAction: attack', () => {
 
 describe('applyAction: defend', () => {
   it('accepts higher same-suit defense', () => {
+    // Give attacker a matching-rank throw-in card so the round doesn't
+    // auto-complete after the defense (we want to inspect the resulting
+    // table state). Give defender a spare card so the post-defense
+    // hand isn't empty (which would block throw-ins via the cap rule).
     const attack = card('7', 'spades');
     const defense = card('K', 'spades');
     const state = makeState({
-      players: [player('p0'), player('p1', [defense])],
+      players: [
+        player('p0', [card('K', 'clubs')]),
+        player('p1', [defense, card('6', 'diamonds')]),
+      ],
       table: [pair(attack)],
     });
     const result = unwrap(
       applyAction(state, { type: 'defend', playerId: 'p1', pairIndex: 0, card: defense }),
     );
     expect(result.table[0]!.defense).toEqual(defense);
-    expect(result.players[1]!.hand).toEqual([]);
+    expect(result.players[1]!.hand).toEqual([card('6', 'diamonds')]);
   });
 
   it('accepts trump against non-trump attack', () => {
     const attack = card('A', 'spades');
     const trump = card('6', 'hearts');
     const state = makeState({
-      players: [player('p0'), player('p1', [trump])],
+      players: [
+        player('p0', [card('A', 'clubs')]),
+        player('p1', [trump, card('K', 'diamonds')]),
+      ],
       table: [pair(attack)],
       trumpSuit: 'hearts',
     });
@@ -494,14 +504,16 @@ describe('applyAction: defend', () => {
     expect(result.defenderTaking).toBe(false);
   });
 
-  it('does NOT auto-complete when more attacks are still allowed', () => {
-    // Cap is 6 attacks but only one defended pair exists, so attackers
-    // could still throw in more — the round stays open.
+  it('does NOT auto-complete when a non-defender still holds a legal throw-in', () => {
+    // p0 holds K♣ — a legal throw-in (rank K is on the table once defended).
+    // Defender has a spare 6♦ so the post-defense hand isn't empty (an empty
+    // defender hand would block throw-ins via the undefended-cap rule and
+    // auto-complete the round regardless).
     const kingH = card('K', 'hearts');
     const state = makeState({
       players: [
-        player('p0', [card('A', 'clubs')]),
-        player('p1', [kingH]),
+        player('p0', [card('K', 'clubs')]),
+        player('p1', [kingH, card('6', 'diamonds')]),
         player('p2', [card('J', 'clubs')]),
       ],
       attackerIndex: 0,
@@ -520,6 +532,36 @@ describe('applyAction: defend', () => {
     );
     expect(result.table).toHaveLength(1);
     expect(result.table[0]!.defense).toEqual(kingH);
+  });
+
+  it('auto-completes when every non-defender has no legal throw-in', () => {
+    // Same shape as above but neither non-defender's card matches a rank
+    // on the table (7 or K) — both are auto-passed, so the round ends as
+    // soon as the defender clears the pending attack.
+    const kingH = card('K', 'hearts');
+    const state = makeState({
+      players: [
+        player('p0', [card('A', 'clubs')]),
+        player('p1', [kingH]),
+        player('p2', [card('J', 'clubs')]),
+      ],
+      attackerIndex: 0,
+      defenderIndex: 1,
+      table: [pair(card('7', 'hearts'))],
+      roundAttackLimit: 6,
+      defenderRoundStartHandSize: 6,
+      deck: [],
+    });
+    const result = unwrap(
+      applyAction(state, {
+        type: 'defend',
+        playerId: 'p1',
+        pairIndex: 0,
+        card: kingH,
+      }),
+    );
+    expect(result.table).toEqual([]);
+    expect(result.defenderTaking).toBe(false);
   });
 });
 
@@ -593,8 +635,11 @@ describe('applyAction: transfer', () => {
 
 describe('applyAction: take', () => {
   it('sets defenderTaking on success', () => {
+    // p0 holds 7♥ — a legal throw-in (rank matches the 7♠ already on the
+    // table) — so the round doesn't immediately auto-complete after p1
+    // declares take.
     const state = makeState({
-      players: [player('p0'), player('p1')],
+      players: [player('p0', [card('7', 'hearts')]), player('p1')],
       table: [pair(card('7', 'spades'))],
     });
     const r = unwrap(applyAction(state, { type: 'take', playerId: 'p1' }));
@@ -655,14 +700,16 @@ describe('applyAction: pass + round transition', () => {
   });
 
   it('after take, attacker advances 2 (defender skips); cards go to defender', () => {
-    // 3-player: p0 attacks p1; p1 takes; p2 passes.
+    // 3-player: p0 attacks p1; p1 takes; p2 passes. Both non-defenders
+    // hold a rank-7 card so they can each still throw in — that means
+    // BOTH must explicitly pass before the round closes (no auto-pass).
     const attack1 = card('7', 'spades');
     const attack2 = card('7', 'hearts');
     const state = makeState({
       players: [
-        player('p0', []),
+        player('p0', [card('7', 'diamonds')]),
         player('p1', []),
-        player('p2', []),
+        player('p2', [card('7', 'clubs')]),
       ],
       deck: Array.from({ length: 30 }, (_, i) => card(
         (['6','7','8','9','10','J','Q','K','A'] as const)[i % 9]!,
@@ -692,11 +739,15 @@ describe('applyAction: pass + round transition', () => {
   });
 
   it('one non-defender passing is not enough in a 3-player game', () => {
+    // Both non-defenders hold cards matching a rank on the table, so the
+    // round only closes after BOTH explicitly pass — auto-pass doesn't
+    // kick in for either. Defender holds a spare so the post-defense hand
+    // isn't empty (which would otherwise block throw-ins entirely).
     const state = makeState({
       players: [
-        player('p0'),
-        player('p1'),
-        player('p2'),
+        player('p0', [card('7', 'diamonds')]),
+        player('p1', [card('6', 'diamonds')]),
+        player('p2', [card('K', 'diamonds')]),
       ],
       table: [pair(card('7', 'spades'), card('K', 'spades'))],
       attackerIndex: 0,

@@ -3,7 +3,10 @@
   gap: 24px;
   flex-wrap: wrap;
   justify-content: center;
-  align-items: center;
+  /* Top-align so card-sized drop zones line up with the actual card
+     (which sits at the top of the taller .pair box — .pair reserves
+     extra height for the diagonal defense overlay). */
+  align-items: flex-start;
   /* Tall enough that the deck stack (top-left) doesn't crowd a row of
      pair drops; bigger left padding reserves a "lane" for the deck. */
   min-height: clamp(220px, 32vh, 320px);
@@ -79,15 +82,16 @@
   filter: drop-shadow(-2px 3px 5px rgba(0, 0, 0, 0.55));
 }
 
-.pair.droppable {
-  outline: 2px dashed transparent;
-  outline-offset: 4px;
+.pair.droppable .attack-slot {
+  outline: 2px dashed rgba(245, 158, 11, 0.55);
+  outline-offset: 6px;
   border-radius: 4px;
-  transition: outline-color 0.15s;
+  transition: outline-color 0.15s, box-shadow 0.15s;
 }
 
-.pair.drop-target-active {
+.pair.drop-target-active .attack-slot {
   outline-color: #f59e0b;
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.55);
 }
 
 /* Drop zones sit ON the felt, so we tint them darker than the felt and
@@ -98,14 +102,17 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 100px;
-  height: clamp(108px, 19vw, 146px);
+  /* Mirror CardSvg exactly — same width clamp + aspect ratio — so the
+     drop zones are visually the same size as a card on the row. */
+  width: clamp(68px, 13vw, 100px);
+  aspect-ratio: 167 / 242;
   padding: 8px;
   border-radius: 8px;
   font-size: 12px;
   text-align: center;
   transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s,
     color 0.15s;
+  box-sizing: border-box;
 }
 
 .attack-zone {

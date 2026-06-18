@@ -120,12 +120,17 @@ function GamePanel({ state, onAction, onShowError }: Props) {
     !fullyDefended &&
     !isOut;
   const haveIPassed = state.passedPlayerIds.includes(myId);
+  // Hide "done attacking" for non-defenders whose hand can't throw in any
+  // card — the server treats them as auto-passed, so showing the button
+  // would be empty ceremony. (anyLegal in throw-in phase = has throw-in,
+  // since defend/transfer aren't options for a non-defender.)
   const canPass =
     !isDefender &&
     state.table.length > 0 &&
     !isOut &&
     !haveIPassed &&
-    (state.defenderTaking || fullyDefended);
+    (state.defenderTaking || fullyDefended) &&
+    legalMoves.anyLegal;
 
   // Drop-zone visibility
   // Any card legal as attack/throw-in → show attack zone

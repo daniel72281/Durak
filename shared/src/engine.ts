@@ -173,6 +173,11 @@ export function applyAction(state: GameState, action: Action): EngineResult {
     case 'pass':     result = handlePass(state, action); break;
   }
   if (!result.ok) return result;
+  // After any action, see whether the throw-in phase is "effectively done"
+  // — every non-defender either passed or holds no card that could legally
+  // be thrown in. In that case the round completes automatically; no point
+  // making players who have nothing to add press "Done attacking".
+  const afterAutoComplete = maybeAutoCompleteRound(result.state);
   // After every action that reduces a hand, check whether anyone has emptied
   // their hand with the deck already exhausted — they're out, and the game
   // may be over (one player left with cards = the durak). This is on top of
@@ -181,8 +186,22 @@ export function applyAction(state: GameState, action: Action): EngineResult {
   // immediately in a 2-player game rather than waiting for an explicit pass.
   // Also clear `firstAttackerReason` so the client's "X starts" toast only
   // fires on game start, not on every state update mid-game.
-  const next = checkMidActionGameEnd(result.state);
+  const next = checkMidActionGameEnd(afterAutoComplete);
   return ok({ ...next, firstAttackerReason: null });
+}
+
+// If we're in the throw-in phase (defender taking OR table fully defended)
+// and every non-defender is either explicitly passed or has no card that
+// could legally be thrown in, end the round. Idempotent: returns the state
+// unchanged when no auto-complete is warranted.
+function maybeAutoCompleteRound(state: GameState): GameState {
+  if (state.phase !== 'playing') return state;
+  if (state.table.length === 0) return state;
+  const throwInPhase =
+    state.defenderTaking || tableIsFullyDefended(state.table);
+  if (!throwInPhase) return state;
+  if (!allNonDefendersPassed(state)) return state;
+  return completeRound(state);
 }
 
 // If the deck is empty and a player's hand has just become empty, mark them
@@ -319,26 +338,15 @@ function handleDefend(
   const newTable = state.table.map((p, i) =>
     i === action.pairIndex ? { ...p, defense: action.card } : p,
   );
-  const updated: GameState = {
+  // applyAction handles the auto-complete check generically — once every
+  // attack is answered, the dispatcher will end the round if no remaining
+  // non-defender can legally throw in.
+  return ok({
     ...state,
     players: newPlayers,
     table: newTable,
     passedPlayerIds: [],
-  };
-
-  // Auto-complete the round when the defender has answered every attack
-  // AND no more attacks can be added (round cap or defender-hand cap
-  // already reached). In that situation waiting on the non-defenders to
-  // press "done attacking" is pure ceremony — no card they hold could be
-  // accepted anyway, so we end the round immediately.
-  const effectiveCap = Math.min(
-    state.roundAttackLimit,
-    state.defenderRoundStartHandSize,
-  );
-  if (tableIsFullyDefended(newTable) && newTable.length >= effectiveCap) {
-    return ok(completeRound(updated));
-  }
-  return ok(updated);
+  });
 }
 
 function handleTransfer(
@@ -405,12 +413,8 @@ function handlePass(state: GameState, action: { playerId: string }): EngineResul
   const newPassed = state.passedPlayerIds.includes(action.playerId)
     ? state.passedPlayerIds
     : [...state.passedPlayerIds, action.playerId];
-  const interimState: GameState = { ...state, passedPlayerIds: newPassed };
-
-  if (!allNonDefendersPassed(interimState)) {
-    return ok(interimState);
-  }
-  return ok(completeRound(interimState));
+  // Round-completion check lives in applyAction's maybeAutoCompleteRound.
+  return ok({ ...state, passedPlayerIds: newPassed });
 }
 
 // ---------------------------------------------------------------------------
@@ -576,16 +580,40 @@ function replacePlayer(
   return arr;
 }
 
+// True when every active non-defender is "done" — either they explicitly
+// passed OR they hold no card that could legally be thrown in right now.
+// The second branch is what auto-passes a player whose hand can't match any
+// rank on the table: forcing them to click "Done attacking" would be empty
+// ceremony since no card they hold could land anyway.
 function allNonDefendersPassed(state: GameState): boolean {
-  const required: string[] = [];
+  const passed = new Set(state.passedPlayerIds);
   for (let i = 0; i < state.players.length; i++) {
     if (i === state.defenderIndex) continue;
     if (state.players[i]!.isOut) continue;
-    required.push(state.players[i]!.id);
+    if (passed.has(state.players[i]!.id)) continue;
+    if (!playerHasLegalThrowIn(state, i)) continue;
+    return false;
   }
-  if (required.length === 0) return true;
-  const passed = new Set(state.passedPlayerIds);
-  return required.every((id) => passed.has(id));
+  return true;
+}
+
+function playerHasLegalThrowIn(state: GameState, playerIdx: number): boolean {
+  const player = state.players[playerIdx]!;
+  const defenderHand = state.players[state.defenderIndex]!.hand.length;
+  // Same convention as handleAttack: while the defender is taking, the
+  // current-hand check is disabled (round-start cap is the active ceiling).
+  const effectiveDefenderHand = state.defenderTaking
+    ? Number.POSITIVE_INFINITY
+    : defenderHand;
+  return player.hand.some((card) =>
+    canAttackCard(
+      card,
+      state.table,
+      effectiveDefenderHand,
+      state.defenderRoundStartHandSize,
+      state.roundAttackLimit,
+    ),
+  );
 }
 
 function ok(state: GameState): EngineSuccess {

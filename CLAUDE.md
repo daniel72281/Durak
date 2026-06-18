@@ -15,7 +15,7 @@ The full plan and design decisions live in `C:\Users\daska\.claude\plans\eager-s
 Three sibling directories under the project root — **no monorepo tooling (no npm workspaces, no pnpm)**, kept simple intentionally. Each has its own `package.json`:
 
 - `client/` — Vite + React + TypeScript frontend (deployed to **Vercel**)
-- `server/` — Node + Express + Socket.IO + TypeScript backend (deployed to **Railway**)
+- `server/` — Node + Express + Socket.IO + TypeScript backend (deployed to **Render**)
 - `shared/` — Pure TS game types + engine, imported by both sides via the `@shared/*` path alias
 
 The `shared/` folder has no runtime — its `.ts` files are consumed directly:
@@ -65,7 +65,8 @@ Other:
 
 Do not implement these without an explicit ask: AI/single-player, accounts, chat, spectators, persistence (DB/Redis), PWA, fancy animations.
 
-## Deployment (planned, not yet wired)
+## Deployment (live)
 
-- **Frontend → Vercel**: root `client/`, set `VITE_SERVER_URL` env var to Railway URL.
-- **Backend → Railway**: root `server/`, start command `npm start` (runs `tsx src/index.ts`). Set `CLIENT_ORIGIN` env var to the Vercel URL.
+- **Frontend → Vercel** at `durak-lac.vercel.app`. Root Directory `client/`, env var `VITE_SERVER_URL` points at the Render service. SPA rewrites in `client/vercel.json` keep deep links from 404-ing on refresh.
+- **Backend → Render** at `durak-server-ts0b.onrender.com` (Frankfurt, Free tier). Root Directory empty — the root `package.json` delegates `build`/`start` to `server/`. Env var `CLIENT_ORIGIN` is the Vercel URL.
+- **Cold-start mitigation:** Render Free spins down after 15 minutes of idle. UptimeRobot pings `/health` every 5 min to keep the service warm. 750 free hours/month is exactly enough for one service running 24/7.
