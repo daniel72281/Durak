@@ -9,6 +9,15 @@
   "common": {
     "turn_timer_label": "{{seconds}} seconds remaining"
   },
+  "gameSelect": {
+    "title": "Choose a game",
+    "coming_soon": "Coming soon",
+    "back_to_games": "← Back to game picker",
+    "durak_name": "Durak",
+    "durak_description": "Multiplayer card game, \"pass-on\" (Переводной) variant.",
+    "shithead_name": "Shithead",
+    "shithead_description": "Fast-paced card game with face-up and face-down cards. Coming soon."
+  },
   "home": {
     "nickname": "Your nickname",
     "nickname_placeholder": "e.g. Alice",

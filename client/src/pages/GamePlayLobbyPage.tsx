@@ -1,18 +1,39 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+// Per-game lobby. Built from the old HomePage — same nickname / create
+// / join layout, but the gameType comes from the URL (/play/:gameType)
+// so the same component serves every game. The join form will navigate
+// to /play/<actual-game>/room/<code>: even if the player joined from
+// the Durak lobby, if they entered a Shithead room's code the server's
+// ack tells us the real gameType and we route accordingly.
+
+import { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import type { GameType } from '@shared/games/common';
 import { socket } from '../socket';
 import { saveSession } from '../lib/session';
 import './HomePage.css';
 
-function HomePage() {
+const KNOWN_GAMES: ReadonlySet<GameType> = new Set(['durak']);
+
+function GamePlayLobbyPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { gameType } = useParams<{ gameType: string }>();
   const [nickname, setNickname] = useState('');
   const [maxPlayers, setMaxPlayers] = useState(4);
   const [joinCode, setJoinCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // Unknown / mistyped gameType in the URL → bounce back to the picker
+  // so we don't silently send a bogus value to the server.
+  useEffect(() => {
+    if (!gameType || !KNOWN_GAMES.has(gameType as GameType)) {
+      navigate('/', { replace: true });
+    }
+  }, [gameType, navigate]);
+  if (!gameType || !KNOWN_GAMES.has(gameType as GameType)) return null;
+  const typedGameType = gameType as GameType;
 
   const handleCreate = () => {
     setError(null);
@@ -22,22 +43,27 @@ function HomePage() {
       return;
     }
     setBusy(true);
-    socket.emit('room:create', { nickname: cleanNick, maxPlayers, gameType: 'durak' }, (ack) => {
-      setBusy(false);
-      if (!ack.ok) {
-        setError(ack.error);
-        return;
-      }
-      saveSession({
-        roomId: ack.roomId,
-        playerId: ack.playerId,
-        nickname: cleanNick,
-        isOwner: true,
-      });
-      navigate(`/room/${ack.roomId}`, {
-        state: { nickname: cleanNick, playerId: ack.playerId, isOwner: true },
-      });
-    });
+    socket.emit(
+      'room:create',
+      { nickname: cleanNick, maxPlayers, gameType: typedGameType },
+      (ack) => {
+        setBusy(false);
+        if (!ack.ok) {
+          setError(ack.error);
+          return;
+        }
+        saveSession({
+          roomId: ack.roomId,
+          playerId: ack.playerId,
+          nickname: cleanNick,
+          isOwner: true,
+          gameType: typedGameType,
+        });
+        navigate(`/play/${typedGameType}/room/${ack.roomId}`, {
+          state: { nickname: cleanNick, playerId: ack.playerId, isOwner: true },
+        });
+      },
+    );
   };
 
   const handleJoin = () => {
@@ -53,27 +79,36 @@ function HomePage() {
       return;
     }
     setBusy(true);
-    socket.emit('room:join', { roomId: cleanCode, nickname: cleanNick }, (ack) => {
-      setBusy(false);
-      if (!ack.ok) {
-        setError(ack.error);
-        return;
-      }
-      saveSession({
-        roomId: cleanCode,
-        playerId: ack.playerId,
-        nickname: cleanNick,
-        isOwner: false,
-      });
-      navigate(`/room/${cleanCode}`, {
-        state: { nickname: cleanNick, playerId: ack.playerId, isOwner: false },
-      });
-    });
+    socket.emit(
+      'room:join',
+      { roomId: cleanCode, nickname: cleanNick },
+      (ack) => {
+        setBusy(false);
+        if (!ack.ok) {
+          setError(ack.error);
+          return;
+        }
+        // The room's actual gameType might differ from the lobby the user
+        // came from — route to the URL that matches the *real* game.
+        saveSession({
+          roomId: cleanCode,
+          playerId: ack.playerId,
+          nickname: cleanNick,
+          isOwner: false,
+          gameType: ack.gameType,
+        });
+        navigate(`/play/${ack.gameType}/room/${cleanCode}`, {
+          state: { nickname: cleanNick, playerId: ack.playerId, isOwner: false },
+        });
+      },
+    );
   };
 
   return (
     <div className="home-page">
-      <p className="home-subtitle">{t('app.subtitle')}</p>
+      <p className="home-subtitle">
+        {t(`gameSelect.${typedGameType}_name`)} · {t('app.subtitle')}
+      </p>
 
       <label className="home-field">
         <span>{t('home.nickname')}</span>
@@ -126,8 +161,16 @@ function HomePage() {
       </div>
 
       {error && <p className="home-error">{error}</p>}
+
+      <button
+        type="button"
+        className="back-link"
+        onClick={() => navigate('/')}
+      >
+        {t('gameSelect.back_to_games')}
+      </button>
     </div>
   );
 }
 
-export default HomePage;
+export default GamePlayLobbyPage;

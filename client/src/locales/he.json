@@ -9,6 +9,15 @@
   "common": {
     "turn_timer_label": "{{seconds}} שניות נותרו"
   },
+  "gameSelect": {
+    "title": "בחר משחק",
+    "coming_soon": "בקרוב",
+    "back_to_games": "← חזרה לבחירת משחק",
+    "durak_name": "דוראק",
+    "durak_description": "משחק קלפים רב-משתתפים, וריאציית \"מעבר\" (Переводной).",
+    "shithead_name": "שיט-האד",
+    "shithead_description": "משחק קלפים מהיר עם קלפים גלויים וסגויים. בקרוב."
+  },
   "home": {
     "nickname": "הכינוי שלך",
     "nickname_placeholder": "לדוגמה: אלון",

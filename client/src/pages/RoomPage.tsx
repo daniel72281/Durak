@@ -25,7 +25,7 @@ interface NavState {
 
 function RoomPage() {
   const { t } = useTranslation();
-  const { roomId } = useParams<{ roomId: string }>();
+  const { roomId, gameType } = useParams<{ roomId: string; gameType: string }>();
   const location = useLocation();
   const navigate = useNavigate();
   const navStateFromRouter = (location.state ?? null) as NavState | null;
@@ -73,6 +73,15 @@ function RoomPage() {
       navigate('/', { replace: true });
     }
   }, [navState, navigate, roomId]);
+
+  // Defensive: if the room turns out to host a different game than the URL
+  // claims (stale link, manual edit, etc.), redirect to the correct
+  // /play/<game>/room/<id>. Only fires when roomState arrives.
+  useEffect(() => {
+    if (roomState && roomId && gameType && roomState.gameType !== gameType) {
+      navigate(`/play/${roomState.gameType}/room/${roomId}`, { replace: true });
+    }
+  }, [roomState?.gameType, gameType, roomId, navigate, roomState]);
 
   useEffect(() => {
     const onRoomState = (s: RoomStatePayload) => {

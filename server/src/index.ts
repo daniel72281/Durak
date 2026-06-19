@@ -191,7 +191,8 @@ io.on('connection', (socket) => {
     if (!result.ok) return ack({ ok: false, error: result.error });
     socketToPlayer.set(socket.id, result.playerId);
     void socket.join(result.roomId);
-    ack({ ok: true, playerId: result.playerId });
+    const room = rooms.getRoom(result.roomId)!;
+    ack({ ok: true, playerId: result.playerId, gameType: room.gameType });
     broadcastRoomState(result.roomId);
   });
 

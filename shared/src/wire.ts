@@ -35,6 +35,10 @@ export interface RoomJoinPayload {
 }
 export interface RoomJoinAck {
   playerId: string;
+  // Tells the client which game the room is hosting so it can navigate
+  // to the right /play/<gameType>/room/<id> URL even when the user
+  // joined from a different game's lobby.
+  gameType: GameType;
 }
 
 // Rejoin: client comes back from a transient disconnect (or page reload).
