@@ -84,6 +84,7 @@
       "burned": "נשרפו",
       "pile_empty": "(ריקה)",
       "pile_count": "{{count}} קלפים",
+      "pile_burn_hint": "עוד {{needed}} {{rank}} ונשרף",
       "hand_count": "יד {{count}}",
       "facedown_count": "סגורים {{count}}",
       "your_turn": "תורכם",

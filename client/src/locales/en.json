@@ -84,6 +84,7 @@
       "burned": "Burned",
       "pile_empty": "(empty)",
       "pile_count": "{{count}} cards",
+      "pile_burn_hint": "{{needed}} more {{rank}} to burn",
       "hand_count": "Hand {{count}}",
       "facedown_count": "Down {{count}}",
       "your_turn": "Your turn",

@@ -124,6 +124,40 @@
   color: #555;
 }
 
+/* Same-rank run badge over the top card of the pile. Shows when 2+
+   cards of the same rank are stacked on top, so players see at a
+   glance how close the pile is to a four-in-a-row burn. */
+
+.shi-pile-card-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.shi-pile-run {
+  position: absolute;
+  inset-block-start: -6px;
+  inset-inline-end: -10px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border-radius: 14px;
+  background: #f59e0b;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.95rem;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  border: 2px solid #fff;
+}
+
+.shi-pile-burn-hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #b45309;
+  font-weight: 600;
+}
+
 /* ---- self area ---- */
 
 .shi-self {

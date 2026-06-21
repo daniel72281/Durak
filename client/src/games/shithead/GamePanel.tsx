@@ -31,6 +31,23 @@ function cardKey(c: Card): string {
   return `${c.rank}-${c.suit}`;
 }
 
+// How many cards of the SAME rank sit at the top of the pile? Helps the
+// UI flag two things at a glance:
+//   - how many cards the previous actor just laid down together
+//   - how close the pile is to a four-in-a-row burn (4 - runCount more
+//     of the same rank ends the round)
+// 3s on top break the run since they're a different rank literally.
+function topRunCount(pile: readonly Card[]): number {
+  if (pile.length === 0) return 0;
+  const topRank = pile[pile.length - 1]!.rank;
+  let count = 1;
+  for (let i = pile.length - 2; i >= 0; i--) {
+    if (pile[i]!.rank === topRank) count++;
+    else break;
+  }
+  return count;
+}
+
 function ShitheadGamePanel({ state, onAction, onShowError }: Props) {
   const { t } = useTranslation();
   const selfId = state.players[state.selfIndex]?.id ?? '';
@@ -315,13 +332,28 @@ function PlayingView({
         <div className="shi-board-col shi-pile">
           <p className="shi-board-label">{t('games.shithead.pile')}</p>
           {pileTop ? (
-            <CardSvg card={pileTop} />
+            <div className="shi-pile-card-wrap">
+              <CardSvg card={pileTop} />
+              {topRunCount(state.pile) > 1 && (
+                <span className="shi-pile-run" aria-label="same-rank run">
+                  ×{topRunCount(state.pile)}
+                </span>
+              )}
+            </div>
           ) : (
             <div className="shi-pile-empty">{t('games.shithead.pile_empty')}</div>
           )}
           <p className="shi-pile-count">
             {t('games.shithead.pile_count', { count: state.pile.length })}
           </p>
+          {pileTop && topRunCount(state.pile) >= 2 && topRunCount(state.pile) < 4 && (
+            <p className="shi-pile-burn-hint">
+              {t('games.shithead.pile_burn_hint', {
+                needed: 4 - topRunCount(state.pile),
+                rank: pileTop.rank,
+              })}
+            </p>
+          )}
         </div>
         <div className="shi-board-col">
           <p className="shi-board-label">{t('games.shithead.burned')}</p>
