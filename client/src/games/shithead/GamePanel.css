@@ -134,21 +134,28 @@
 }
 
 .shi-pile-run {
+  /* Physical top/right pin so the badge sits over the back edge of the
+     card regardless of RTL/LTR — the rank numerals print on the
+     top-left and bottom-right of the artwork, so the top-right corner
+     stays clear of them. */
   position: absolute;
-  inset-block-start: -6px;
-  inset-inline-end: -10px;
-  min-width: 28px;
-  height: 28px;
-  padding: 0 6px;
-  border-radius: 14px;
+  top: -10px;
+  right: -10px;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 16px;
   background: #f59e0b;
   color: #fff;
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: 1rem;
   display: grid;
   place-items: center;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.45);
   border: 2px solid #fff;
+  z-index: 2;
+  /* The badge text itself is always LTR ("×3") even on a Hebrew page. */
+  direction: ltr;
 }
 
 .shi-pile-burn-hint {

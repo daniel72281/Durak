@@ -31,19 +31,37 @@ function cardKey(c: Card): string {
   return `${c.rank}-${c.suit}`;
 }
 
-// How many cards of the SAME rank sit at the top of the pile? Helps the
-// UI flag two things at a glance:
+// Sort order shared by hand + faceUp displays: low-to-high by rank,
+// with Joker placed at the very end. Suits break ties deterministically.
+const RANK_ORDER: Record<Card['rank'], number> = {
+  '2': 0, '3': 1, '4': 2, '5': 3, '6': 4, '7': 5, '8': 6,
+  '9': 7, '10': 8, J: 9, Q: 10, K: 11, A: 12, JOKER: 13,
+};
+const SUIT_ORDER: Record<Card['suit'], number> = {
+  clubs: 0, diamonds: 1, hearts: 2, spades: 3,
+};
+function sortCards(cards: readonly Card[]): Card[] {
+  return cards.slice().sort((a, b) => {
+    const r = RANK_ORDER[a.rank] - RANK_ORDER[b.rank];
+    if (r !== 0) return r;
+    return SUIT_ORDER[a.suit] - SUIT_ORDER[b.suit];
+  });
+}
+
+// How many cards of the SAME literal rank sit at the top of the pile?
+// Helps the UI flag two things at a glance:
 //   - how many cards the previous actor just laid down together
 //   - how close the pile is to a four-in-a-row burn (4 - runCount more
 //     of the same rank ends the round)
-// 3s on top break the run since they're a different rank literally.
+// Strictly literal rank equality (K==K, 5==5, JOKER==JOKER) — 3s on top
+// don't merge with the rank under them, they break the run.
 function topRunCount(pile: readonly Card[]): number {
   if (pile.length === 0) return 0;
   const topRank = pile[pile.length - 1]!.rank;
   let count = 1;
   for (let i = pile.length - 2; i >= 0; i--) {
-    if (pile[i]!.rank === topRank) count++;
-    else break;
+    if (pile[i]!.rank !== topRank) break;
+    count++;
   }
   return count;
 }
@@ -104,29 +122,38 @@ function SetupView({
   onShowError,
 }: Pick<Props, 'state' | 'onAction' | 'onShowError'>) {
   const { t } = useTranslation();
-  const [picked, setPicked] = useState<readonly number[]>([]);
+  // Track picks by cardKey so the selection survives the sorted reorder.
+  const [pickedKeys, setPickedKeys] = useState<readonly string[]>([]);
   const selfPlayer = state.players[state.selfIndex];
   const myFaceUp = state.selfFaceUp;
-  const myHand = state.selfHand;
+  const sortedHand = useMemo(() => sortCards(state.selfHand), [state.selfHand]);
   const alreadyConfirmed = myFaceUp.length === 3;
 
-  const toggle = (idx: number) => {
-    setPicked((cur) => {
-      if (cur.includes(idx)) return cur.filter((i) => i !== idx);
+  const toggle = (key: string) => {
+    setPickedKeys((cur) => {
+      if (cur.includes(key)) return cur.filter((k) => k !== key);
       if (cur.length === 3) return cur;
-      return [...cur, idx];
+      return [...cur, key];
     });
   };
 
   const confirm = () => {
-    if (picked.length !== 3) {
+    if (pickedKeys.length !== 3) {
       onShowError(t('games.shithead.setup_pick_three'));
       return;
+    }
+    // Engine wants indexes into the AUTHORITATIVE hand (the server's
+    // unsorted order). Map each picked cardKey back to its original
+    // index.
+    const indexes: number[] = [];
+    for (const key of pickedKeys) {
+      const idx = state.selfHand.findIndex((c) => cardKey(c) === key);
+      if (idx !== -1) indexes.push(idx);
     }
     onAction({
       type: 'shi.setup.confirm',
       playerId: selfPlayer?.id ?? '',
-      faceUpIndexes: picked,
+      faceUpIndexes: indexes,
     });
   };
 
@@ -139,25 +166,28 @@ function SetupView({
         <>
           <p className="shi-status">{t('games.shithead.setup_instruction')}</p>
           <div className="shi-hand">
-            {myHand.map((c, i) => (
-              <button
-                key={cardKey(c) + i}
-                type="button"
-                className={`shi-card-btn ${picked.includes(i) ? 'picked' : ''}`}
-                onClick={() => toggle(i)}
-                aria-label={`${c.rank} ${c.suit}`}
-              >
-                <CardSvg card={c} />
-              </button>
-            ))}
+            {sortedHand.map((c) => {
+              const k = cardKey(c);
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  className={`shi-card-btn ${pickedKeys.includes(k) ? 'picked' : ''}`}
+                  onClick={() => toggle(k)}
+                  aria-label={`${c.rank} ${c.suit}`}
+                >
+                  <CardSvg card={c} />
+                </button>
+              );
+            })}
           </div>
           <button
             type="button"
             className="primary"
-            disabled={picked.length !== 3}
+            disabled={pickedKeys.length !== 3}
             onClick={confirm}
           >
-            {t('games.shithead.setup_confirm', { picked: picked.length })}
+            {t('games.shithead.setup_confirm', { picked: pickedKeys.length })}
           </button>
         </>
       )}
@@ -195,10 +225,14 @@ function PlayingView({
   onAction,
   onShowError,
 }: PlayingProps) {
-  // Selected hand / faceUp indexes for the next play. The action shape
-  // requires same-rank cards, so the panel groups selection by rank.
-  const [selectedHand, setSelectedHand] = useState<readonly number[]>([]);
-  const [selectedFaceUp, setSelectedFaceUp] = useState<readonly number[]>([]);
+  // Selected cards (by stable cardKey) for the next play. The action
+  // shape requires same-rank cards, so toggling enforces single-rank
+  // groups. Selection is by key — independent of the sorted display
+  // order, so reorders don't fall apart.
+  const [selectedHandKeys, setSelectedHandKeys] = useState<readonly string[]>([]);
+  const [selectedFaceUpKeys, setSelectedFaceUpKeys] = useState<readonly string[]>([]);
+  const sortedHand = useMemo(() => sortCards(state.selfHand), [state.selfHand]);
+  const sortedFaceUp = useMemo(() => sortCards(state.selfFaceUp), [state.selfFaceUp]);
 
   // What phase is THIS player in? Drives which set of cards is interactive.
   const playerPhase = useMemo(() => {
@@ -214,39 +248,52 @@ function PlayingView({
     state.selfFaceDownCount,
   ]);
 
-  const toggleHand = (i: number) => {
-    setSelectedFaceUp([]);
-    const c = state.selfHand[i]!;
-    setSelectedHand((cur) => {
-      if (cur.includes(i)) return cur.filter((x) => x !== i);
-      // Enforce same-rank selection: clear any non-matching picks first.
-      const compatible = cur.filter(
-        (x) => state.selfHand[x]?.rank === c.rank,
-      );
-      return [...compatible, i];
+  // Look up a Card by its cardKey from the actor's authoritative hand /
+  // faceUp. Returns null when the key has gone stale (the card was
+  // played in a prior action and the new state no longer contains it).
+  const handByKey = (k: string) =>
+    state.selfHand.find((c) => cardKey(c) === k) ?? null;
+  const faceUpByKey = (k: string) =>
+    state.selfFaceUp.find((c) => cardKey(c) === k) ?? null;
+
+  const toggleHand = (k: string) => {
+    setSelectedFaceUpKeys([]);
+    const c = handByKey(k);
+    if (!c) return;
+    setSelectedHandKeys((cur) => {
+      if (cur.includes(k)) return cur.filter((x) => x !== k);
+      // Enforce same-rank selection: drop any prior picks of a different
+      // rank before adding the new one.
+      const compatible = cur.filter((x) => handByKey(x)?.rank === c.rank);
+      return [...compatible, k];
     });
   };
 
-  const toggleFaceUp = (i: number) => {
-    setSelectedHand([]);
-    const c = state.selfFaceUp[i]!;
-    setSelectedFaceUp((cur) => {
-      if (cur.includes(i)) return cur.filter((x) => x !== i);
-      const compatible = cur.filter(
-        (x) => state.selfFaceUp[x]?.rank === c.rank,
-      );
-      return [...compatible, i];
+  const toggleFaceUp = (k: string) => {
+    setSelectedHandKeys([]);
+    const c = faceUpByKey(k);
+    if (!c) return;
+    setSelectedFaceUpKeys((cur) => {
+      if (cur.includes(k)) return cur.filter((x) => x !== k);
+      const compatible = cur.filter((x) => faceUpByKey(x)?.rank === c.rank);
+      return [...compatible, k];
     });
   };
 
   const clearSelection = () => {
-    setSelectedHand([]);
-    setSelectedFaceUp([]);
+    setSelectedHandKeys([]);
+    setSelectedFaceUpKeys([]);
   };
 
   const playSelected = () => {
-    if (selectedHand.length > 0) {
-      const cards = selectedHand.map((i) => state.selfHand[i]!);
+    if (selectedHandKeys.length > 0) {
+      const cards = selectedHandKeys
+        .map((k) => handByKey(k))
+        .filter((c): c is Card => c !== null);
+      if (cards.length === 0) {
+        onShowError(t('games.shithead.play_select_first'));
+        return;
+      }
       onAction({
         type: 'shi.play',
         playerId: selfId,
@@ -256,8 +303,14 @@ function PlayingView({
       clearSelection();
       return;
     }
-    if (selectedFaceUp.length > 0) {
-      const cards = selectedFaceUp.map((i) => state.selfFaceUp[i]!);
+    if (selectedFaceUpKeys.length > 0) {
+      const cards = selectedFaceUpKeys
+        .map((k) => faceUpByKey(k))
+        .filter((c): c is Card => c !== null);
+      if (cards.length === 0) {
+        onShowError(t('games.shithead.play_select_first'));
+        return;
+      }
       onAction({
         type: 'shi.play',
         playerId: selfId,
@@ -376,35 +429,41 @@ function PlayingView({
 
         {playerPhase === 'hand' && (
           <div className="shi-hand">
-            {state.selfHand.map((c, i) => (
-              <button
-                key={cardKey(c) + i}
-                type="button"
-                className={`shi-card-btn ${selectedHand.includes(i) ? 'picked' : ''}`}
-                onClick={() => toggleHand(i)}
-                disabled={!handInteractive}
-                aria-label={`${c.rank} ${c.suit}`}
-              >
-                <CardSvg card={c} />
-              </button>
-            ))}
+            {sortedHand.map((c) => {
+              const k = cardKey(c);
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  className={`shi-card-btn ${selectedHandKeys.includes(k) ? 'picked' : ''}`}
+                  onClick={() => toggleHand(k)}
+                  disabled={!handInteractive}
+                  aria-label={`${c.rank} ${c.suit}`}
+                >
+                  <CardSvg card={c} />
+                </button>
+              );
+            })}
           </div>
         )}
 
         {playerPhase === 'faceUp' && (
           <div className="shi-hand">
-            {state.selfFaceUp.map((c, i) => (
-              <button
-                key={cardKey(c) + i}
-                type="button"
-                className={`shi-card-btn ${selectedFaceUp.includes(i) ? 'picked' : ''}`}
-                onClick={() => toggleFaceUp(i)}
-                disabled={!handInteractive}
-                aria-label={`${c.rank} ${c.suit}`}
-              >
-                <CardSvg card={c} />
-              </button>
-            ))}
+            {sortedFaceUp.map((c) => {
+              const k = cardKey(c);
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  className={`shi-card-btn ${selectedFaceUpKeys.includes(k) ? 'picked' : ''}`}
+                  onClick={() => toggleFaceUp(k)}
+                  disabled={!handInteractive}
+                  aria-label={`${c.rank} ${c.suit}`}
+                >
+                  <CardSvg card={c} />
+                </button>
+              );
+            })}
           </div>
         )}
 
@@ -435,7 +494,7 @@ function PlayingView({
             onClick={playSelected}
             disabled={
               !handInteractive ||
-              (selectedHand.length === 0 && selectedFaceUp.length === 0)
+              (selectedHandKeys.length === 0 && selectedFaceUpKeys.length === 0)
             }
           >
             {t('games.shithead.play_button')}
