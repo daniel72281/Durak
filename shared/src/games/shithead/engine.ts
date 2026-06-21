@@ -245,18 +245,20 @@ function handlePlay(
   }
 
   // Turn check. Normally the actor must be the current player; the
-  // quick-chain rule loosens that: a player who just drew a card of the
-  // same rank they played can chain it in even though `currentPlayerIdx`
-  // already moved on — provided their action arrives BEFORE the next
+  // quick-chain rule loosens that: a player who just played a card and
+  // wound up holding another of the same rank — whether through a draw-
+  // deck refill OR by transitioning to faceUp phase with a matching
+  // faceUp card — can chain it in even though `currentPlayerIdx` has
+  // already moved on, provided their action arrives BEFORE the next
   // player plays. The race is decided naturally by socket-arrival order
-  // on the server.
+  // on the server. Source can be 'hand' or 'faceUp' to support the
+  // post-empty-hand chain into faceUp phase.
   if (playerIdx !== state.currentPlayerIdx) {
     const qc = state.quickChainEligible;
     if (
       !qc ||
       qc.playerId !== action.playerId ||
-      qc.rank !== rank ||
-      action.source !== 'hand'
+      qc.rank !== rank
     ) {
       return fail('not your turn');
     }
@@ -304,23 +306,40 @@ function handlePlay(
   const newDeck = state.deck.slice();
   let newHand: Card[] = player.hand.slice();
   let newFaceUp: Card[] = player.faceUp.slice();
-  let drewSameRank = false;
+  let chainEligibleAfter = false;
   if (action.source === 'hand') {
     newHand = remainingSource;
     const handLenBeforeRefill = newHand.length;
     while (newHand.length < POST_SETUP_HAND_TARGET && newDeck.length > 0) {
       newHand.push(newDeck.pop()!);
     }
-    // Quick-chain trigger: did the refill draw at least one card of the
-    // same rank the actor just played?
+    // Quick-chain trigger A: refill drew at least one card of the same
+    // rank the actor just played — chain another from hand.
     for (let i = handLenBeforeRefill; i < newHand.length; i++) {
       if (newHand[i]!.rank === rank) {
-        drewSameRank = true;
+        chainEligibleAfter = true;
         break;
       }
     }
+    // Quick-chain trigger B: the actor just emptied their hand, the
+    // deck is dry too, AND their face-up pile still has a card of the
+    // same rank. They can chain it from face-up before the next player
+    // acts — same race as the refill case.
+    if (
+      !chainEligibleAfter &&
+      newHand.length === 0 &&
+      newDeck.length === 0 &&
+      newFaceUp.some((c) => c.rank === rank)
+    ) {
+      chainEligibleAfter = true;
+    }
   } else {
     newFaceUp = remainingSource;
+    // Quick-chain trigger C: still in face-up phase with another
+    // matching card available — chain it.
+    if (newFaceUp.some((c) => c.rank === rank)) {
+      chainEligibleAfter = true;
+    }
   }
 
   const newPlayers = state.players.map((p, i) =>
@@ -339,7 +358,7 @@ function handlePlay(
       newPlayers,
       rank,
       playedCount: cards.length,
-      drewSameRank,
+      drewSameRank: chainEligibleAfter,
     }),
   );
 }

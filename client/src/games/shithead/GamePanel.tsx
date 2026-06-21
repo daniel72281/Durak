@@ -399,7 +399,7 @@ function PlayingView({
                 type="button"
                 className={`shi-card-btn ${selectedFaceUp.includes(i) ? 'picked' : ''}`}
                 onClick={() => toggleFaceUp(i)}
-                disabled={!isMyTurn}
+                disabled={!handInteractive}
                 aria-label={`${c.rank} ${c.suit}`}
               >
                 <CardSvg card={c} />

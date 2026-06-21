@@ -1281,6 +1281,41 @@ describe('Shithead: quick-chain (refill same rank)', () => {
     expect(reject.ok).toBe(false);
   });
 
+  it('arms the chain when the actor empties hand+deck and has the same rank in faceUp', () => {
+    // A holds [3C] in hand, deck is empty, and a 3S waits face-up.
+    // After playing the 3C, A is in faceUp phase. Same-rank 3 is in
+    // face-up, so quickChainEligible arms and A can chain it before B
+    // plays.
+    const state = makePlayingState({
+      hands: [[card('3', 'clubs')], [card('5', 'hearts')]],
+      faceUp: [[card('3', 'spades')], []],
+      pile: [card('K', 'hearts')],
+      deck: [],
+    });
+    const r = unwrap(
+      applyAction(state, {
+        type: 'shi.play',
+        playerId: 'a',
+        source: 'hand',
+        cards: [card('3', 'clubs')],
+      }),
+    );
+    expect(r.players[0]!.hand).toHaveLength(0);
+    expect(r.players[0]!.faceUp).toEqual([card('3', 'spades')]);
+    expect(r.quickChainEligible).toEqual({ playerId: 'a', rank: '3' });
+    // A chains the matching face-up 3 before B plays.
+    const chained = unwrap(
+      applyAction(r, {
+        type: 'shi.play',
+        playerId: 'a',
+        source: 'faceUp',
+        cards: [card('3', 'spades')],
+      }),
+    );
+    expect(chained.pile[chained.pile.length - 1]).toEqual(card('3', 'spades'));
+    expect(chained.players[0]!.faceUp).toHaveLength(0);
+  });
+
   it('does not arm the chain when refill draws a different rank', () => {
     const state = makePlayingState({
       hands: [[card('K', 'spades')], [card('Q', 'clubs')]],
