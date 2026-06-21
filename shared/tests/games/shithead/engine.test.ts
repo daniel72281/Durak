@@ -657,7 +657,7 @@ describe('Shithead: Joker', () => {
     expect(playR.ok).toBe(false);
   });
 
-  it('shi.joker.choose hands the pile to the victim and advances to the player after them', () => {
+  it('shi.joker.choose hands the non-Joker pile to the victim, burns the Joker(s)', () => {
     const state = makePlayingState({
       hands: [[card('JOKER', 'spades')], [card('K', 'clubs')], []],
       pile: [card('5', 'hearts'), card('7', 'hearts')],
@@ -679,8 +679,14 @@ describe('Shithead: Joker', () => {
     );
     expect(s.pile).toHaveLength(0);
     expect(s.pendingJokerChooserId).toBeNull();
-    // Victim received pile (5H + 7H + JOKERS) on top of their starting hand.
-    expect(s.players[1]!.hand.length).toBe(1 + 3);
+    // Victim received only the non-Joker cards (5H + 7H) — the Joker
+    // itself was burned, not given.
+    expect(s.players[1]!.hand).toEqual([
+      card('K', 'clubs'),
+      card('5', 'hearts'),
+      card('7', 'hearts'),
+    ]);
+    expect(s.burnedPile).toEqual([card('JOKER', 'spades')]);
     // Turn went to the player AFTER the victim (b → c).
     expect(s.currentPlayerIdx).toBe(2);
   });

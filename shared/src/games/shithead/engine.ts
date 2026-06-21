@@ -635,8 +635,13 @@ function handleJokerChoose(
   const victim = state.players[victimIdx]!;
   if (victim.isOut) return fail('victim is out');
 
+  // The Joker(s) themselves don't go to the victim — they burn. The
+  // victim only swallows the non-Joker cards that were on the pile.
+  const jokers = state.pile.filter((c) => c.rank === 'JOKER');
+  const nonJokers = state.pile.filter((c) => c.rank !== 'JOKER');
+
   const newPlayers = state.players.map((p, i) =>
-    i === victimIdx ? { ...p, hand: p.hand.concat(state.pile) } : p,
+    i === victimIdx ? { ...p, hand: p.hand.concat(nonJokers) } : p,
   );
 
   const nextIdx = nextActivePlayerIndex(newPlayers, victimIdx);
@@ -644,6 +649,7 @@ function handleJokerChoose(
   return ok({
     ...state,
     pile: [],
+    burnedPile: state.burnedPile.concat(jokers),
     players: newPlayers,
     currentPlayerIdx: nextIdx === -1 ? state.currentPlayerIdx : nextIdx,
     pendingJokerChooserId: null,
