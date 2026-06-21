@@ -331,21 +331,37 @@ function PlayingView({
     onAction({ type: 'shi.takePile', playerId: selfId });
   };
 
-  const burstFromHand = () => {
-    // Grab every 4 the player owns — Shithead lets you slam them all
-    // down in a single burst. With four 4s the engine triggers a
-    // four-in-a-row burn and the burster keeps their turn.
-    const fours = state.selfHand.filter((c) => c.rank === '4');
-    if (fours.length === 0) {
-      onShowError(t('games.shithead.burst_no_four'));
+  // Burst gathers every 4 the player owns and slams them in one shot.
+  // Hand source takes precedence; the faceUp fallback covers the case
+  // where the player has already emptied their hand AND the draw deck
+  // has been exhausted (faceUp phase) — without this the button used
+  // to grey out at exactly the moment a 4 from face-up could still
+  // burn the pile.
+  const burst = () => {
+    const handFours = state.selfHand.filter((c) => c.rank === '4');
+    if (handFours.length > 0) {
+      onAction({
+        type: 'shi.burst',
+        playerId: selfId,
+        source: 'hand',
+        cards: handFours,
+      });
       return;
     }
-    onAction({
-      type: 'shi.burst',
-      playerId: selfId,
-      source: 'hand',
-      cards: fours,
-    });
+    const inFaceUpPhase = state.selfHand.length === 0 && state.deckCount === 0;
+    if (inFaceUpPhase) {
+      const faceUpFours = state.selfFaceUp.filter((c) => c.rank === '4');
+      if (faceUpFours.length > 0) {
+        onAction({
+          type: 'shi.burst',
+          playerId: selfId,
+          source: 'faceUp',
+          cards: faceUpFours,
+        });
+        return;
+      }
+    }
+    onShowError(t('games.shithead.burst_no_four'));
   };
 
   const revealFaceDown = (index: number) => {
@@ -510,11 +526,20 @@ function PlayingView({
           <button
             type="button"
             className="secondary"
-            onClick={burstFromHand}
+            onClick={burst}
             disabled={
-              !state.selfHand.some((c) => c.rank === '4') ||
-              (state.pile.length > 0 &&
-                state.pile.some((c) => c.rank !== '4'))
+              (() => {
+                const inFaceUpPhase =
+                  state.selfHand.length === 0 && state.deckCount === 0;
+                const hasFour =
+                  state.selfHand.some((c) => c.rank === '4') ||
+                  (inFaceUpPhase &&
+                    state.selfFaceUp.some((c) => c.rank === '4'));
+                const pileAllows =
+                  state.pile.length === 0 ||
+                  state.pile.every((c) => c.rank === '4');
+                return !hasFour || !pileAllows;
+              })()
             }
             title={t('games.shithead.burst_with_4_hint')}
           >

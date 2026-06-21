@@ -91,6 +91,8 @@
       "waiting_for_other": "Waiting…",
       "quick_chain_open": "Quick! Chain another {{rank}} before the next player plays",
       "notice_auto_take": "{{nickname}} can't respond — taking the pile in 3s",
+      "notice_burn_ten": "🔥 {{nickname}} played a 10 — pile burned!",
+      "notice_burn_four": "🔥 {{nickname}} stacked four-in-a-row — pile burned!",
       "phase_hand": "play from hand",
       "phase_faceUp": "play from face-up",
       "phase_faceDown": "reveal face-down (blind)",

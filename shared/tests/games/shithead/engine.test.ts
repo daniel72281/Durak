@@ -550,6 +550,63 @@ describe('Shithead: shi.play — magic cards', () => {
     expect(r.currentPlayerIdx).toBe(2);
   });
 
+  it('in a 2-player game any number of 8s keeps the turn with the actor', () => {
+    // 1× 8 in 2 players
+    const oneEight = makePlayingState({
+      hands: [[card('8', 'spades')], [card('K', 'clubs')]],
+      pile: [card('5', 'hearts')],
+    });
+    const r1 = unwrap(
+      applyAction(oneEight, {
+        type: 'shi.play',
+        playerId: 'a',
+        source: 'hand',
+        cards: [card('8', 'spades')],
+      }),
+    );
+    expect(r1.currentPlayerIdx).toBe(0);
+
+    // 2× 8 in 2 players (without the 2-player rule this would land on B)
+    const twoEights = makePlayingState({
+      hands: [
+        [card('8', 'spades'), card('8', 'diamonds')],
+        [card('K', 'clubs')],
+      ],
+      pile: [card('5', 'hearts')],
+    });
+    const r2 = unwrap(
+      applyAction(twoEights, {
+        type: 'shi.play',
+        playerId: 'a',
+        source: 'hand',
+        cards: [card('8', 'spades'), card('8', 'diamonds')],
+      }),
+    );
+    expect(r2.currentPlayerIdx).toBe(0);
+
+    // 3× 8 in 2 players
+    const threeEights = makePlayingState({
+      hands: [
+        [card('8', 'spades'), card('8', 'diamonds'), card('8', 'hearts')],
+        [card('K', 'clubs')],
+      ],
+      pile: [card('5', 'hearts')],
+    });
+    const r3 = unwrap(
+      applyAction(threeEights, {
+        type: 'shi.play',
+        playerId: 'a',
+        source: 'hand',
+        cards: [
+          card('8', 'spades'),
+          card('8', 'diamonds'),
+          card('8', 'hearts'),
+        ],
+      }),
+    );
+    expect(r3.currentPlayerIdx).toBe(0);
+  });
+
   it('2× 8 in 3 players returns the turn to the same player', () => {
     const state = makePlayingState({
       hands: [

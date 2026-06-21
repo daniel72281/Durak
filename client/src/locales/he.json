@@ -91,6 +91,8 @@
       "waiting_for_other": "ממתינים…",
       "quick_chain_open": "מהר! זרקו עוד {{rank}} לפני שהשחקן הבא מגיב",
       "notice_auto_take": "{{nickname}} לא יכול להגיב — מרים את הערימה תוך 3 שניות",
+      "notice_burn_ten": "🔥 {{nickname}} שיחק 10 — הערימה נשרפה!",
+      "notice_burn_four": "🔥 {{nickname}} סגר רביעייה — הערימה נשרפה!",
       "phase_hand": "משחקים מהיד",
       "phase_faceUp": "משחקים מהפתוחים",
       "phase_faceDown": "חושפים סגור (עיוור)",

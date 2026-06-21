@@ -147,6 +147,48 @@ function broadcastGameState(roomId: string): void {
   }
 }
 
+// Shithead burn announcer: detects "the pile just burned" by comparing
+// pre/post burnedPile size, and emits a transient toast so spectators
+// can read what happened — the engine clears the pile inline so there's
+// no other visible cue beyond the burned counter incrementing.
+//
+// Two distinct burn causes both ship the same notice key (cause spelt
+// out in i18n) so the client doesn't have to branch:
+//   - 10 burn: actor's play contained a 10
+//   - 4-in-a-row / 4-of-a-kind: the actor's play stacked four of the
+//     same rank onto the pile
+//
+// shi.joker.choose also lands the Joker(s) into burnedPile but that's
+// part of the Joker mechanic, not a "pile burn" the user has been
+// asking about, so we skip it here.
+function maybeAnnounceShitheadBurn(
+  room: rooms.Room,
+  before: ShitheadGameState,
+  after: ShitheadGameState,
+  action: { type?: string; playerId?: string },
+): void {
+  if (action.type === 'shi.joker.choose') return;
+  const burnedGrew = after.burnedPile.length > before.burnedPile.length;
+  const pileEmptied = before.pile.length >= 0 && after.pile.length === 0;
+  if (!burnedGrew || !pileEmptied) return;
+
+  const actor = after.players.find((p) => p.id === action.playerId);
+  if (!actor) return;
+
+  // Distinguish 10-burn from four-in-a-row by looking at what landed in
+  // burnedPile this turn. Last items are the most recent additions; if
+  // any are 10s, it's a ten-burn.
+  const justBurned = after.burnedPile.slice(before.burnedPile.length);
+  const hasTen = justBurned.some((c) => c.rank === '10');
+  io.to(room.id).emit('game:notice', {
+    i18nKey: hasTen
+      ? 'games.shithead.notice_burn_ten'
+      : 'games.shithead.notice_burn_four',
+    i18nArgs: { nickname: actor.nickname },
+    durationMs: 3000,
+  });
+}
+
 // Shithead's auto-take: when the current actor has no legal play and the
 // pile is non-empty, the engine no longer takes the pile inline (so the
 // state ships unchanged after the action). The server schedules the
@@ -380,6 +422,12 @@ io.on('connection', (socket) => {
       return ack({ ok: false, error: 'cannot act on behalf of another player' });
     }
     const engine = engineFor(room);
+    // Snapshot the pre-action state so we can detect Shithead burn-pile
+    // transitions (pile -> burnedPile grew, pile is now empty) and
+    // announce them. Joker.choose also moves the Joker into burnedPile
+    // but that's not a "pile burn" in the user-facing sense, so it's
+    // excluded below.
+    const preActionGame = room.game;
     const result = engine.applyAction(room.game, action);
     if (!result.ok) return ack({ ok: false, error: result.error });
     room.game = result.state;
@@ -390,6 +438,14 @@ io.on('connection', (socket) => {
     }
     ack({ ok: true });
     broadcastGameState(room.id);
+    if (room.gameType === 'shithead' && preActionGame) {
+      maybeAnnounceShitheadBurn(
+        room,
+        preActionGame as ShitheadGameState,
+        result.state as ShitheadGameState,
+        action as { type?: string; playerId?: string },
+      );
+    }
     // Shithead-only: if the new current player can't play, schedule an
     // auto-take with a 3-second notice so spectators see what's going on.
     maybeScheduleAutoTake(room);

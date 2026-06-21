@@ -424,14 +424,22 @@ function applyPostPlay(args: {
   // is NOT state.currentPlayerIdx) advance naturally.
   let nextIdx = args.playerIdx;
   if (!samePlayerReplays) {
-    const steps = args.rank === '8' ? args.playedCount + 1 : 1;
-    let cur = args.playerIdx;
-    for (let s = 0; s < steps; s++) {
-      const next = nextActivePlayerIndex(args.newPlayers, cur);
-      if (next === -1) break;
-      cur = next;
+    const activeCount = args.newPlayers.filter((p) => !p.isOut).length;
+    if (args.rank === '8' && activeCount <= 2) {
+      // 2-player rule: 8s keep the turn with the actor. You can't skip
+      // yourself, and there's only one other seat — every skip bounces
+      // the round back, so any number of 8s leaves you on turn.
+      nextIdx = args.playerIdx;
+    } else {
+      const steps = args.rank === '8' ? args.playedCount + 1 : 1;
+      let cur = args.playerIdx;
+      for (let s = 0; s < steps; s++) {
+        const next = nextActivePlayerIndex(args.newPlayers, cur);
+        if (next === -1) break;
+        cur = next;
+      }
+      nextIdx = cur;
     }
-    nextIdx = cur;
   }
 
   // Re-arm the chain only when the turn ACTUALLY left the actor (any
