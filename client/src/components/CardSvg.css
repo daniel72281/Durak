@@ -58,3 +58,97 @@
     inset 0 0 0 1px rgba(0, 0, 0, 0.7),
     0 4px 10px rgba(0, 0, 0, 0.35);
 }
+
+/* ---- text fallback (used when SVG artwork is missing) ---- */
+
+.card-svg.fallback {
+  background: #fff;
+}
+
+.card-fallback {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: block;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: bold;
+}
+
+.card-svg.fallback.red .card-fallback {
+  color: #d20a0a;
+}
+
+.card-svg.fallback.black .card-fallback {
+  color: #111;
+}
+
+.card-fallback-corner {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+}
+
+.card-fallback-corner.top {
+  inset-block-start: 6%;
+  inset-inline-start: 8%;
+}
+
+.card-fallback-corner.bottom {
+  inset-block-end: 6%;
+  inset-inline-end: 8%;
+  transform: rotate(180deg);
+}
+
+.card-fallback-corner > span:first-child {
+  font-size: clamp(11px, 1.6vw, 16px);
+}
+
+.card-fallback-corner > span:last-child {
+  font-size: clamp(10px, 1.4vw, 14px);
+}
+
+.card-fallback-center {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: clamp(28px, 5vw, 42px);
+}
+
+.card-svg.fallback.small .card-fallback-corner > span:first-child {
+  font-size: clamp(9px, 1.2vw, 12px);
+}
+.card-svg.fallback.small .card-fallback-corner > span:last-child {
+  font-size: clamp(8px, 1vw, 11px);
+}
+.card-svg.fallback.small .card-fallback-center {
+  font-size: clamp(18px, 3vw, 26px);
+}
+
+/* Joker has its own layout — single big star + the word JOKER. */
+
+.card-fallback.joker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-around;
+  padding-block: 10%;
+  color: #6a1b9a;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: bold;
+}
+
+.card-fallback-joker-mark {
+  font-size: clamp(22px, 4vw, 36px);
+}
+
+.card-fallback-joker-mark.inverted {
+  transform: rotate(180deg);
+}
+
+.card-fallback-joker-text {
+  font-size: clamp(10px, 1.5vw, 14px);
+  letter-spacing: 0.1em;
+}

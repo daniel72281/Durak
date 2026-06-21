@@ -9,11 +9,13 @@ import type { GameType } from '@shared/games/common';
 import './GameSelectPage.css';
 
 interface GameTile {
-  gameType: GameType | 'shithead'; // 'shithead' here as a preview; only 'durak' is wired
+  gameType: GameType;
   available: boolean;
   nameKey: string;
   descKey: string;
 }
+
+// Update Shithead's English/Hebrew description now that the game is live.
 
 const TILES: GameTile[] = [
   {
@@ -24,7 +26,7 @@ const TILES: GameTile[] = [
   },
   {
     gameType: 'shithead',
-    available: false,
+    available: true,
     nameKey: 'gameSelect.shithead_name',
     descKey: 'gameSelect.shithead_description',
   },

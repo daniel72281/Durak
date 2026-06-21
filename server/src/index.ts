@@ -9,6 +9,11 @@ import type {
   ServerToClientEvents,
 } from '../../shared/src/wire';
 import { games, type GameEngine } from '../../shared/src/games/common';
+import {
+  applyAutoTakeIfNeeded as shitheadApplyAutoTake,
+  canPlayerPlay as shitheadCanPlay,
+} from '../../shared/src/games/shithead/engine';
+import type { ShitheadGameState } from '../../shared/src/games/shithead/types';
 import * as rooms from './rooms';
 import {
   clearTurnTimer,
@@ -142,6 +147,53 @@ function broadcastGameState(roomId: string): void {
   }
 }
 
+// Shithead's auto-take: when the current actor has no legal play and the
+// pile is non-empty, the engine no longer takes the pile inline (so the
+// state ships unchanged after the action). The server schedules the
+// take 3 seconds later, broadcasting a notice first so all players see
+// "X cannot respond — taking pile in 3s" before the pile actually moves.
+// Cancelled if any other action arrives in the meantime.
+const AUTO_TAKE_DELAY_MS = 3000;
+
+function maybeScheduleAutoTake(room: rooms.Room): void {
+  if (room.autoTakeTimer) {
+    clearTimeout(room.autoTakeTimer);
+    room.autoTakeTimer = null;
+  }
+  if (room.gameType !== 'shithead') return;
+  if (!room.game) return;
+  const state = room.game as ShitheadGameState;
+  if (state.phase !== 'playing') return;
+  if (state.pendingJokerChooserId !== null) return;
+  if (state.pile.length === 0) return;
+  const cur = state.players[state.currentPlayerIdx];
+  if (!cur || cur.isOut) return;
+  if (shitheadCanPlay(state, state.currentPlayerIdx)) return;
+
+  io.to(room.id).emit('game:notice', {
+    i18nKey: 'games.shithead.notice_auto_take',
+    i18nArgs: { nickname: cur.nickname },
+    durationMs: AUTO_TAKE_DELAY_MS,
+  });
+
+  room.autoTakeTimer = setTimeout(() => {
+    const r = rooms.getRoom(room.id);
+    if (!r) return;
+    r.autoTakeTimer = null;
+    if (!r.game || r.gameType !== 'shithead') return;
+    const newState = shitheadApplyAutoTake(r.game as ShitheadGameState);
+    r.game = newState;
+    if (newState.phase === 'playing') {
+      startTurnTimer(r.id, () => handleTimerExpiry(r.id));
+    } else {
+      clearTurnTimer(r.id);
+    }
+    broadcastGameState(r.id);
+    // The taker's next-active neighbour might also be stuck — check again.
+    maybeScheduleAutoTake(r);
+  }, AUTO_TAKE_DELAY_MS);
+}
+
 // Called when the 20s turn timer fires for a room: apply the engine's
 // default expiry action and re-broadcast.
 function handleTimerExpiry(roomId: string): void {
@@ -251,9 +303,14 @@ io.on('connection', (socket) => {
     for (const pid of engine.outOrder(room.game)) {
       if (room.players.some((p) => p.id === pid)) { startPlayerId = pid; break; }
     }
+    // Previous game's loser, threaded into createGame so engines can apply
+    // a restart penalty (Shithead deals the loser's face-up randomly).
+    const previousLoserId =
+      (room.game as { loser?: string | null } | null)?.loser ?? null;
     try {
       const initial = engine.createGame(
         room.players.map((p) => ({ id: p.id, nickname: p.nickname })),
+        { previousLoserId },
       );
       const shuffled = engine.buildShuffledDeck();
       // startGame in Durak supports an options arg with startPlayerId.
@@ -333,6 +390,9 @@ io.on('connection', (socket) => {
     }
     ack({ ok: true });
     broadcastGameState(room.id);
+    // Shithead-only: if the new current player can't play, schedule an
+    // auto-take with a 3-second notice so spectators see what's going on.
+    maybeScheduleAutoTake(room);
   });
 
   socket.on('disconnect', (reason) => {

@@ -7,7 +7,7 @@
 import type { Card, PlayerScore } from '../types';
 
 // Allowed game ids. Add a new string here when registering a new game.
-export type GameType = 'durak';
+export type GameType = 'durak' | 'shithead';
 
 // Minimal player descriptor passed into createGame.
 export interface PlayerSpec {
@@ -28,12 +28,24 @@ export interface EngineError {
 }
 export type EngineResult<S> = EngineSuccess<S> | EngineError;
 
+// Restart-time context shared across games. Server passes this on
+// game:restart so engines can apply game-specific carryover rules:
+//   - Shithead reads `previousLoserId` to mark the new shithead with
+//     `forcedFaceUp` so the engine deals their face-up cards randomly.
+//   - Durak ignores it (its restart-starter logic lives on startGame's
+//     own options arg).
+export interface CreateGameContext {
+  previousLoserId?: string | null;
+}
+
 // The contract each game implements. The server holds an opaque `unknown`
 // state per room and lets the engine mutate it — only the engine has the
 // right typed view of its own State.
 export interface GameEngine<State, Action, ClientState> {
   // Construct the initial 'waiting' state from the room's player list.
-  createGame(players: PlayerSpec[]): State;
+  // `context` is non-null on game:restart and may carry the previous
+  // game's loser id for engines that want to apply a restart penalty.
+  createGame(players: PlayerSpec[], context?: CreateGameContext): State;
 
   // Build a fresh shuffled draw deck appropriate for this game. Pass an
   // explicit `rng` from tests for determinism; production uses Math.random.
@@ -98,10 +110,11 @@ export interface GameEngine<State, Action, ClientState> {
 // per-game type information intact at every callsite that knows the
 // gameType statically (which is most of them, after gameType discrimination).
 //
-// Stage 4 will add `shitheadEngine` next to `durakEngine`.
 import { durakEngine as _durakEngine } from './durak';
+import { shitheadEngine as _shitheadEngine } from './shithead';
 export const games = {
   durak: _durakEngine,
+  shithead: _shitheadEngine,
 } as const satisfies Record<GameType, unknown>;
 
 // Re-exported for callers that want the registry type without importing

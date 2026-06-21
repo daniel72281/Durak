@@ -12,12 +12,32 @@ export const SUITS_IN_ORDER: readonly Suit[] = [
   'spades',
 ];
 
-// Ranks in ascending order of value. '6' is the lowest; 'A' the highest.
-// (Durak deck. Shithead adds '2'..'5' and possibly Joker — see its types.)
+// Ranks for the Durak 36-card deck, in ascending order of value. Stays
+// named RANKS_IN_ORDER for backwards compat with the Durak code; other
+// games define their own ascending lists in games/<g>/rules.ts.
 export const RANKS_IN_ORDER = [
   '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A',
 ] as const;
-export type Rank = (typeof RANKS_IN_ORDER)[number];
+
+// Every rank any game on the platform might use. Durak only ever produces
+// 6..A; Shithead adds 2..5 and a Joker. Card.rank is typed against this
+// union so a Card from one game is structurally compatible with the other
+// (useful for the shared dnd-kit id format, etc.).
+export type Rank =
+  | '2'
+  | '3'
+  | '4'
+  | '5'
+  | '6'
+  | '7'
+  | '8'
+  | '9'
+  | '10'
+  | 'J'
+  | 'Q'
+  | 'K'
+  | 'A'
+  | 'JOKER';
 
 export interface Card {
   suit: Suit;

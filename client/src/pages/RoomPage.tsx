@@ -1,8 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import type { RoomClosedReason, RoomStatePayload } from '@shared/wire';
-import type { Action, ClientGameState } from '@shared/games/durak';
+import type {
+  Action,
+  ClientGameState,
+  RoomClosedReason,
+  RoomStatePayload,
+} from '@shared/wire';
+import type { ClientGameState as DurakClientGameState } from '@shared/games/durak';
 import {
   socket,
   getLatestRoomState,
@@ -13,6 +18,9 @@ import {
 import ConfirmDialog from '../components/ConfirmDialog';
 import GamePanel from '../games/durak/GamePanel';
 import GameOverDialog from '../games/durak/GameOverDialog';
+import ShitheadGamePanel from '../games/shithead/GamePanel';
+import ShitheadGameOverDialog from '../games/shithead/GameOverDialog';
+import type { ShitheadClientGameState } from '@shared/games/shithead';
 import Toast from '../components/Toast';
 import { clearSession, loadSession } from '../lib/session';
 import './RoomPage.css';
@@ -94,15 +102,28 @@ function RoomPage() {
       clearSession();
       setClosedReason(p.reason);
     };
+    // game:notice carries a server-side translation key + args so each
+    // client renders in their own language. Used by Shithead to announce
+    // "Player X cannot respond — taking pile in 3s" before the auto-take
+    // actually runs.
+    const onNotice = (p: {
+      i18nKey: string;
+      i18nArgs?: { [k: string]: string | number };
+      durationMs: number;
+    }) => {
+      showToast(t(p.i18nKey, p.i18nArgs ?? {}), p.durationMs);
+    };
     socket.on('room:state', onRoomState);
     socket.on('game:state', onGameState);
     socket.on('room:closed', onClosed);
+    socket.on('game:notice', onNotice);
     return () => {
       socket.off('room:state', onRoomState);
       socket.off('game:state', onGameState);
       socket.off('room:closed', onClosed);
+      socket.off('game:notice', onNotice);
     };
-  }, [roomId]);
+  }, [roomId, t]);
 
   useEffect(() => {
     if (roomState) hasJoinedRef.current = true;
@@ -116,6 +137,18 @@ function RoomPage() {
 
   useEffect(() => () => clearRoomCache(), []);
 
+  // Narrow the wire-level union by the room's declared game type. Each
+  // GamePanel is hardcoded for its own state shape; the narrowing keeps
+  // the type system honest without sprinkling `as` casts at every read.
+  const durakGameState: DurakClientGameState | null =
+    roomState?.gameType === 'durak' && gameState
+      ? (gameState as DurakClientGameState)
+      : null;
+  const shitheadGameState: ShitheadClientGameState | null =
+    roomState?.gameType === 'shithead' && gameState
+      ? (gameState as ShitheadClientGameState)
+      : null;
+
   // Show a one-off toast at the start of each game explaining who's the
   // first attacker and why. The server sets firstAttackerReason in
   // startGame and clears it (to null) after the first action of the round,
@@ -123,10 +156,10 @@ function RoomPage() {
   // the server sets a fresh reason in the new game.
   const prevReasonRef = useRef<string | null>(null);
   useEffect(() => {
-    const reason = gameState?.firstAttackerReason ?? null;
+    const reason = durakGameState?.firstAttackerReason ?? null;
     if (reason && reason !== prevReasonRef.current) {
       const nickname =
-        gameState?.players[gameState.attackerIndex]?.nickname ?? '?';
+        durakGameState?.players[durakGameState.attackerIndex]?.nickname ?? '?';
       if (reason === 'six_of_trumps') {
         setToastMessage(t('games.durak.first_attacker_six_of_trumps', { nickname }));
       } else if (reason === 'previous_winner') {
@@ -136,7 +169,7 @@ function RoomPage() {
       }
     }
     prevReasonRef.current = reason;
-  }, [gameState, t]);
+  }, [durakGameState, t]);
 
   // On every (re)connect, try to rejoin the room using saved credentials.
   // This handles transient socket drops AND tab refreshes — the server
@@ -240,11 +273,23 @@ function RoomPage() {
   if (roomState.isPlaying && gameState) {
     return (
       <>
-        <GamePanel
-          state={gameState}
-          onAction={handleGameAction}
-          onShowError={showToast}
-        />
+        {durakGameState && (
+          <GamePanel
+            state={durakGameState}
+            onAction={handleGameAction}
+            onShowError={showToast}
+          />
+        )}
+        {shitheadGameState && (
+          <ShitheadGamePanel
+            state={shitheadGameState}
+            onAction={handleGameAction}
+            onShowError={showToast}
+          />
+        )}
+        {!durakGameState && !shitheadGameState && (
+          <div className="room-loading">{t('room.loading_game')}</div>
+        )}
         <div className="in-game-actions">
           <button
             type="button"
@@ -254,9 +299,26 @@ function RoomPage() {
             {t('room.leave_room')}
           </button>
         </div>
-        {gameState.phase === 'finished' && (
+        {durakGameState && durakGameState.phase === 'finished' && (
           <GameOverDialog
-            state={gameState}
+            state={durakGameState}
+            isOwner={roomState.selfPlayerId === roomState.ownerId}
+            onPlayAgain={() => {
+              socket.emit('game:restart', {}, (ack) => {
+                if (!ack.ok) setToastMessage(ack.error);
+              });
+            }}
+            onBackHome={() => {
+              socket.emit('room:leave', {}, () => {
+                clearSession();
+                goHome();
+              });
+            }}
+          />
+        )}
+        {shitheadGameState && shitheadGameState.phase === 'finished' && (
+          <ShitheadGameOverDialog
+            state={shitheadGameState}
             isOwner={roomState.selfPlayerId === roomState.ownerId}
             onPlayAgain={() => {
               socket.emit('game:restart', {}, (ack) => {

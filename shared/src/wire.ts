@@ -3,7 +3,20 @@
 
 import type { PublicPlayer } from './types';
 import type { GameType } from './games/common';
-import type { Action, ClientGameState } from './games/durak';
+import type { Action as DurakAction, ClientGameState as DurakClientGameState } from './games/durak';
+import type {
+  ShitheadAction,
+  ShitheadClientGameState,
+} from './games/shithead';
+
+// Union of all games' player actions. The server's dispatcher looks at
+// the action.type prefix ('shi.*' vs Durak's bare 'attack'/'defend'/...)
+// and routes to the right engine.
+export type Action = DurakAction | ShitheadAction;
+
+// Union of every game's per-player view state. Clients narrow with the
+// surrounding RoomStatePayload.gameType to know which shape to render.
+export type ClientGameState = DurakClientGameState | ShitheadClientGameState;
 
 // Marker type for events that carry no extra payload (other than ok flag).
 export type EmptyPayload = Record<string, never>;
@@ -77,6 +90,17 @@ export interface GameErrorPayload {
   message: string;
 }
 
+// Lightweight informational broadcast — used by the server to announce
+// in-game events whose visual effect is delayed (e.g. Shithead's
+// "Player X cannot respond — taking pile in 3s"). The server sends a
+// translation key + arguments so each client renders in their own
+// language without the server holding i18n state.
+export interface GameNoticePayload {
+  i18nKey: string;
+  i18nArgs?: { [name: string]: string | number };
+  durationMs: number;
+}
+
 // --- Socket.IO typed event maps
 
 export interface ClientToServerEvents {
@@ -119,4 +143,5 @@ export interface ServerToClientEvents {
   'game:state': (state: ClientGameState) => void;
   'room:closed': (payload: RoomClosedPayload) => void;
   'game:error': (payload: GameErrorPayload) => void;
+  'game:notice': (payload: GameNoticePayload) => void;
 }

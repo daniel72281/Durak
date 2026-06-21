@@ -10,9 +10,12 @@ import {
 } from '../../types';
 import type { TablePair } from './types';
 
-// Numeric value for rank comparison. 6 → 0, A → 8.
+// Numeric value for rank comparison. 6 → 0, A → 8. Card['rank'] is the
+// platform-wide union, so cast at the boundary — Durak's deck never
+// contains the lower ranks or jokers, so the indexOf would return -1
+// only for impossible inputs.
 export function rankValue(rank: Card['rank']): number {
-  return RANKS_IN_ORDER.indexOf(rank);
+  return RANKS_IN_ORDER.indexOf(rank as (typeof RANKS_IN_ORDER)[number]);
 }
 
 // Can `defense` legally beat `attack` given the trump suit?

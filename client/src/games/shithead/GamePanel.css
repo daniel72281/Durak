@@ -1,0 +1,222 @@
+/* Shithead game panel. Minimal, mobile-friendly layout.
+   Mirrors the spacing/colors used by the Durak panel so the two games feel
+   like siblings. CSS logical properties used throughout for RTL/LTR. */
+
+.shi-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  max-width: 960px;
+  margin-inline: auto;
+}
+
+.shi-heading {
+  margin: 0;
+  font-size: 1.25rem;
+  text-align: center;
+}
+
+.shi-status {
+  margin: 0;
+  text-align: center;
+  color: #555;
+}
+
+/* ---- player strip (top of board) ---- */
+
+.shi-players {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.shi-player {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background: #fafafa;
+  min-width: 120px;
+}
+
+.shi-player.turn {
+  border-color: #f5a623;
+  box-shadow: 0 0 0 2px #f5a62333;
+}
+
+.shi-player.out {
+  opacity: 0.55;
+}
+
+.shi-player-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 0.9rem;
+}
+
+.shi-player-faceup {
+  display: flex;
+  gap: 2px;
+}
+
+/* ---- board (deck / pile / burned) ---- */
+
+.shi-board {
+  display: flex;
+  justify-content: center;
+  align-items: end;
+  gap: 24px;
+  padding: 12px 0;
+  border-block: 1px solid #ddd;
+}
+
+.shi-board-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 80px;
+}
+
+.shi-board-label {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #777;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.shi-deck-count {
+  font-size: 1.5rem;
+  font-weight: bold;
+  width: 60px;
+  height: 84px;
+  display: grid;
+  place-items: center;
+  background: #f0f0f0;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+}
+
+.shi-pile-empty {
+  width: 60px;
+  height: 84px;
+  display: grid;
+  place-items: center;
+  border: 2px dashed #bbb;
+  border-radius: 6px;
+  color: #999;
+  font-size: 0.8rem;
+}
+
+.shi-pile-count {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #555;
+}
+
+/* ---- self area ---- */
+
+.shi-self {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.shi-hand {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+}
+
+.shi-card-btn {
+  background: none;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  padding: 2px;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.shi-card-btn:hover:not(:disabled) {
+  transform: translateY(-4px);
+}
+
+.shi-card-btn.picked {
+  border-color: #f5a623;
+  background: #fff8e0;
+}
+
+.shi-card-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.shi-card-back {
+  width: 68px;
+  height: 100px;
+  background: #2c3e50;
+  color: #fff;
+  font-size: 2rem;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+}
+
+.shi-facedown-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.shi-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding-block-start: 8px;
+}
+
+.shi-actions button {
+  min-width: 140px;
+}
+
+/* ---- joker chooser ---- */
+
+.shi-joker-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 24px;
+  background: #fff;
+  border: 2px solid #f5a623;
+  border-radius: 12px;
+  margin: 24px auto;
+  max-width: 500px;
+}
+
+.shi-joker-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+}
+
+/* ---- finished ---- */
+
+.shi-finished {
+  text-align: center;
+  padding-block-start: 32px;
+}

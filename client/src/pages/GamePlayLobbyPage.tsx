@@ -13,7 +13,7 @@ import { socket } from '../socket';
 import { saveSession } from '../lib/session';
 import './HomePage.css';
 
-const KNOWN_GAMES: ReadonlySet<GameType> = new Set(['durak']);
+const KNOWN_GAMES: ReadonlySet<GameType> = new Set(['durak', 'shithead']);
 
 function GamePlayLobbyPage() {
   const { t } = useTranslation();

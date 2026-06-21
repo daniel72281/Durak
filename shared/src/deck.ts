@@ -16,6 +16,25 @@ export function createDeck(): Card[] {
   return deck;
 }
 
+// Returns a fresh 54-card Shithead deck: full 52 (ranks 2..A across the
+// four suits) plus two distinct jokers (rank='JOKER', one in spades for
+// the "black" joker and one in hearts for the "red" joker — the suit
+// just gives them unique cardKeys so the client can dedupe them).
+export function createShitheadDeck(): Card[] {
+  const ranks = [
+    '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A',
+  ] as const;
+  const deck: Card[] = [];
+  for (const suit of SUITS_IN_ORDER) {
+    for (const rank of ranks) {
+      deck.push({ suit, rank });
+    }
+  }
+  deck.push({ suit: 'spades', rank: 'JOKER' });
+  deck.push({ suit: 'hearts', rank: 'JOKER' });
+  return deck;
+}
+
 // Fisher–Yates shuffle. Returns a NEW array; does not mutate the input.
 // Accepts an optional RNG (defaults to Math.random) so tests can be
 // deterministic by passing a seeded function.

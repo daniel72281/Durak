@@ -38,6 +38,11 @@ export interface Room {
   // Per-player timers that fire when a disconnect grace period expires.
   // Cleared if the player rejoins, or when the room itself closes.
   disconnectTimers: Map<string, NodeJS.Timeout>;
+  // Shithead-only: pending auto-take timer. The engine no longer
+  // auto-takes inside applyAction; the server schedules it after a
+  // 3-second notice so spectators can read what's happening. Cleared
+  // when any subsequent action arrives or the timer fires.
+  autoTakeTimer: NodeJS.Timeout | null;
 }
 
 const rooms = new Map<string, Room>();
@@ -99,6 +104,7 @@ export function createRoom(
     scoreboard: new Map([[playerId, { points: 0 }]]),
     scoredCurrentGame: false,
     disconnectTimers: new Map(),
+    autoTakeTimer: null,
   });
   playerToRoom.set(playerId, roomId);
   return { ok: true, roomId, playerId };
@@ -167,6 +173,10 @@ export function closeRoom(roomId: string): void {
   // Cancel any pending disconnect grace timers so they don't fire after teardown.
   for (const t of room.disconnectTimers.values()) clearTimeout(t);
   room.disconnectTimers.clear();
+  if (room.autoTakeTimer) {
+    clearTimeout(room.autoTakeTimer);
+    room.autoTakeTimer = null;
+  }
   for (const player of room.players) {
     playerToRoom.delete(player.id);
   }
