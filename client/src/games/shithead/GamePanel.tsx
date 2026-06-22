@@ -512,66 +512,10 @@ function PlayingView({
           {t(`games.shithead.phase_${playerPhase}`)}
         </p>
 
-        {playerPhase === 'hand' && (
-          <div className="shi-hand">
-            {sortedHand.map((c) => {
-              const k = cardKey(c);
-              return (
-                <button
-                  key={k}
-                  type="button"
-                  className={`shi-card-btn ${selectedHandKeys.includes(k) ? 'picked' : ''}`}
-                  onClick={() => toggleHand(k)}
-                  disabled={!handInteractive}
-                  aria-label={`${c.rank} ${c.suit}`}
-                >
-                  <CardSvg card={c} />
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        {playerPhase === 'faceUp' && (
-          <div className="shi-hand">
-            {sortedFaceUp.map((c) => {
-              const k = cardKey(c);
-              return (
-                <button
-                  key={k}
-                  type="button"
-                  className={`shi-card-btn ${selectedFaceUpKeys.includes(k) ? 'picked' : ''}`}
-                  onClick={() => toggleFaceUp(k)}
-                  disabled={!handInteractive}
-                  aria-label={`${c.rank} ${c.suit}`}
-                >
-                  <CardSvg card={c} />
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        {playerPhase === 'faceDown' && (
-          <div className="shi-facedown-row">
-            <p className="shi-status">{t('games.shithead.facedown_reveal_hint')}</p>
-            <div className="shi-hand">
-              {Array.from({ length: state.selfFaceDownCount }).map((_, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  className="shi-card-btn shi-card-back"
-                  onClick={() => isMyTurn && revealFaceDown(i)}
-                  disabled={!isMyTurn}
-                  aria-label={t('games.shithead.facedown_reveal')}
-                >
-                  ?
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
+        {/* Action row sits ABOVE the cards so the player can always
+            reach Burst/Burn without scrolling past a wide hand. The
+            timing of these actions is critical when a chain or burst
+            window is open. */}
         <div className="shi-actions">
           <button
             type="button"
@@ -636,6 +580,67 @@ function PlayingView({
             </button>
           )}
         </div>
+
+        {playerPhase === 'hand' && (
+          <div className="shi-hand">
+            {sortedHand.map((c) => {
+              const k = cardKey(c);
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  className={`shi-card-btn ${selectedHandKeys.includes(k) ? 'picked' : ''}`}
+                  onClick={() => toggleHand(k)}
+                  disabled={!handInteractive}
+                  aria-label={`${c.rank} ${c.suit}`}
+                >
+                  <CardSvg card={c} />
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {playerPhase === 'faceUp' && (
+          <div className="shi-hand">
+            {sortedFaceUp.map((c) => {
+              const k = cardKey(c);
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  className={`shi-card-btn ${selectedFaceUpKeys.includes(k) ? 'picked' : ''}`}
+                  onClick={() => toggleFaceUp(k)}
+                  disabled={!handInteractive}
+                  aria-label={`${c.rank} ${c.suit}`}
+                >
+                  <CardSvg card={c} />
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {playerPhase === 'faceDown' && (
+          <div className="shi-facedown-row">
+            <p className="shi-status">{t('games.shithead.facedown_reveal_hint')}</p>
+            <div className="shi-hand">
+              {Array.from({ length: state.selfFaceDownCount }).map((_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  className="shi-card-btn shi-card-back"
+                  onClick={() => isMyTurn && revealFaceDown(i)}
+                  disabled={!isMyTurn}
+                  aria-label={t('games.shithead.facedown_reveal')}
+                >
+                  ?
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );
