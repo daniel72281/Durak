@@ -113,3 +113,34 @@
   justify-content: center;
   margin-top: 16px;
 }
+
+/* Floating "Leave room" button pinned to the top-left corner of the
+   viewport during play. Always reachable without scrolling, and
+   high-contrast so it doesn't disappear against the table. Uses the
+   physical `left` so it stays in the same corner regardless of RTL.*/
+.leave-room-fab {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 100;
+  background: #dc2626;
+  color: #fff;
+  border: 2px solid #fff;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  transition: transform 0.12s ease, background 0.12s ease;
+}
+
+.leave-room-fab:hover {
+  background: #b91c1c;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.leave-room-fab:active {
+  transform: translateY(0);
+}

@@ -292,6 +292,14 @@ function RoomPage() {
   if (roomState.isPlaying && gameState) {
     return (
       <>
+        <button
+          type="button"
+          className="leave-room-fab"
+          onClick={() => setShowLeave(true)}
+          aria-label={t('room.leave_room')}
+        >
+          {t('room.leave_room')}
+        </button>
         {durakGameState && (
           <GamePanel
             state={durakGameState}
@@ -309,15 +317,6 @@ function RoomPage() {
         {!durakGameState && !shitheadGameState && (
           <div className="room-loading">{t('room.loading_game')}</div>
         )}
-        <div className="in-game-actions">
-          <button
-            type="button"
-            className="danger"
-            onClick={() => setShowLeave(true)}
-          >
-            {t('room.leave_room')}
-          </button>
-        </div>
         {durakGameState && durakGameState.phase === 'finished' && showGameOver && (
           <GameOverDialog
             state={durakGameState}
