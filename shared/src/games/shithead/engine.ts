@@ -601,6 +601,7 @@ function handleBurst(
   let newHand = player.hand.slice();
   let newFaceUp = player.faceUp.slice();
   const newDeck = state.deck.slice();
+  let chainEligibleAfter = false;
   if (action.source === 'hand') {
     for (const c of cards) {
       const i = newHand.findIndex(
@@ -609,8 +610,28 @@ function handleBurst(
       if (i === -1) return fail('card not in hand');
       newHand.splice(i, 1);
     }
+    // Track refill so we can re-arm the quick-chain when the deck hands
+    // the burster another card of the same rank — same race window as
+    // a regular play.
+    const handLenBeforeRefill = newHand.length;
     while (newHand.length < POST_SETUP_HAND_TARGET && newDeck.length > 0) {
       newHand.push(newDeck.pop()!);
+    }
+    for (let i = handLenBeforeRefill; i < newHand.length; i++) {
+      if (newHand[i]!.rank === rank) {
+        chainEligibleAfter = true;
+        break;
+      }
+    }
+    // Also cover the "I just emptied hand AND deck, but my faceUp still
+    // holds another matching card" transition.
+    if (
+      !chainEligibleAfter &&
+      newHand.length === 0 &&
+      newDeck.length === 0 &&
+      newFaceUp.some((c) => c.rank === rank)
+    ) {
+      chainEligibleAfter = true;
     }
   } else {
     if (player.hand.length > 0) {
@@ -625,6 +646,11 @@ function handleBurst(
       );
       if (i === -1) return fail('card not in faceUp');
       newFaceUp.splice(i, 1);
+    }
+    // FaceUp burst doesn't refill, but if another matching card is
+    // still on the faceUp pile the chain stays open.
+    if (newFaceUp.some((c) => c.rank === rank)) {
+      chainEligibleAfter = true;
     }
   }
 
@@ -653,6 +679,14 @@ function handleBurst(
     nextIdx = candidate === -1 ? state.currentPlayerIdx : candidate;
   }
 
+  // Re-arm the chain only when the burst did NOT burn (burned bursts
+  // already keep the turn with the burster, no chain needed) and the
+  // turn actually left the actor's seat.
+  const reArmChain = chainEligibleAfter && !burned && nextIdx !== playerIdx;
+  const newQuickChain = reArmChain
+    ? { playerId: action.playerId, rank }
+    : null;
+
   return ok({
     ...state,
     pile: newPile,
@@ -660,7 +694,7 @@ function handleBurst(
     deck: newDeck,
     players: newPlayers,
     currentPlayerIdx: nextIdx,
-    quickChainEligible: null,
+    quickChainEligible: newQuickChain,
   });
 }
 

@@ -1603,6 +1603,50 @@ describe('Shithead: shi.burst with multiple 4s', () => {
     expect(r.ok).toBe(false);
   });
 
+  it('arms the chain after a non-burning burst when the refill draws another 4', () => {
+    // 3 players. B (not on turn) bursts with one 4 on an empty pile.
+    // The refill pops another 4 — B should now be able to chain that
+    // drawn 4 via shi.play before C plays their next card.
+    const state = makePlayingState({
+      hands: [
+        [card('K', 'clubs')],
+        [card('4', 'spades')],
+        [card('A', 'hearts')],
+      ],
+      pile: [],
+      deck: [card('4', 'diamonds')], // pops first
+      currentPlayerIdx: 0,
+    });
+    const r1 = unwrap(
+      applyAction(state, {
+        type: 'shi.burst',
+        playerId: 'b',
+        source: 'hand',
+        cards: [card('4', 'spades')],
+      }),
+    );
+    expect(r1.pile).toEqual([card('4', 'spades')]);
+    expect(r1.currentPlayerIdx).toBe(2);
+    expect(r1.quickChainEligible).toEqual({ playerId: 'b', rank: '4' });
+    expect(r1.players[1]!.hand).toEqual([card('4', 'diamonds')]);
+
+    // B chains the drawn 4 before C plays.
+    const r2 = unwrap(
+      applyAction(r1, {
+        type: 'shi.play',
+        playerId: 'b',
+        source: 'hand',
+        cards: [card('4', 'diamonds')],
+      }),
+    );
+    expect(r2.pile).toEqual([
+      card('4', 'spades'),
+      card('4', 'diamonds'),
+    ]);
+    // Chain didn't change whose actual turn it is (still after-B = C).
+    expect(r2.currentPlayerIdx).toBe(2);
+  });
+
   it('rejects a burst that mixes 4s with another rank', () => {
     const state = makePlayingState({
       hands: [
