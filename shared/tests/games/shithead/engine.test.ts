@@ -1169,6 +1169,95 @@ describe('Shithead: take pile (manual + auto)', () => {
     expect(r.ok).toBe(false);
   });
 
+  it('shi.takePile leaves 4s on the table and only sweeps non-4s into the hand', () => {
+    // Pile = [K, 4, 7, 4]. A takes → K and 7 land in A's hand, the two
+    // 4s stay on the table as the new pile.
+    const state = makePlayingState({
+      hands: [[card('5', 'spades')], [card('K', 'clubs')]],
+      pile: [
+        card('K', 'hearts'),
+        card('4', 'spades'),
+        card('7', 'hearts'),
+        card('4', 'diamonds'),
+      ],
+    });
+    const r = unwrap(
+      applyAction(state, { type: 'shi.takePile', playerId: 'a' }),
+    );
+    expect(r.pile).toEqual([
+      card('4', 'spades'),
+      card('4', 'diamonds'),
+    ]);
+    expect(r.players[0]!.hand).toEqual([
+      card('5', 'spades'),
+      card('K', 'hearts'),
+      card('7', 'hearts'),
+    ]);
+    expect(r.currentPlayerIdx).toBe(1);
+  });
+
+  it('joker.choose: jokers burn, 4s stay, the rest goes to the victim', () => {
+    const state = makePlayingState({
+      hands: [[card('JOKER', 'spades')], [card('K', 'clubs')], []],
+      pile: [card('4', 'diamonds'), card('7', 'hearts')],
+    });
+    let s = unwrap(
+      applyAction(state, {
+        type: 'shi.play',
+        playerId: 'a',
+        source: 'hand',
+        cards: [card('JOKER', 'spades')],
+      }),
+    );
+    s = unwrap(
+      applyAction(s, {
+        type: 'shi.joker.choose',
+        playerId: 'a',
+        victimId: 'b',
+      }),
+    );
+    expect(s.pile).toEqual([card('4', 'diamonds')]);
+    expect(s.burnedPile).toEqual([card('JOKER', 'spades')]);
+    expect(s.players[1]!.hand).toEqual([
+      card('K', 'clubs'),
+      card('7', 'hearts'),
+    ]);
+  });
+
+  it('faceDown reveal failure: any 4s in the take-pile stay on the new pile', () => {
+    const state = makePlayingState({
+      hands: [[], []],
+      faceUp: [[], []],
+      faceDown: [
+        [card('6', 'clubs'), card('9', 'spades')],
+        [],
+      ],
+      // Top of pile is a K (constraint = gte K); the 4 is buried so it
+      // doesn't help the actor — the revealed 6 still fails. Pile +
+      // revealed swallow happens with the 4-stays rule.
+      pile: [
+        card('K', 'hearts'),
+        card('4', 'diamonds'),
+        card('K', 'spades'),
+      ],
+    });
+    const r = unwrap(
+      applyAction(state, {
+        type: 'shi.playFaceDown',
+        playerId: 'a',
+        faceDownIndex: 0,
+      }),
+    );
+    expect(r.pile).toEqual([card('4', 'diamonds')]);
+    expect(r.players[0]!.hand).toEqual([
+      card('K', 'hearts'),
+      card('K', 'spades'),
+      card('6', 'clubs'),
+    ]);
+    expect(r.players[0]!.faceDown).toEqual([card('9', 'spades')]);
+    expect(r.currentPlayerIdx).toBe(1);
+  });
+
   it('applyAutoTakeIfNeeded sweeps the pile to a stuck player and advances the turn', () => {
     // 3 players. A plays K. Pile top becomes K. B has only low cards
     // (5,6) → no legal play. The engine no longer auto-takes inside

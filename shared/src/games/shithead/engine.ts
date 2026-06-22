@@ -525,17 +525,23 @@ function handlePlayFaceDown(
     );
   }
 
-  // Failure: actor swallows pile + the revealed card into their hand. The
-  // remaining faceDown stays as-is. Turn advances normally — taking the
-  // pile means the next player after the taker plays (matches plan rule 5).
-  const newHand = player.hand.concat(state.pile, [revealed]);
+  // Failure: actor swallows pile + the revealed card. Same "4s never
+  // go to a hand" rule applies — any 4s in the combined take-pile (the
+  // existing pile plus the revealed card) stay on the table as the new
+  // pile, the rest joins the hand. Remaining faceDown stays as-is.
+  // Turn advances normally — taking the pile means the next player
+  // after the taker plays (matches plan rule 5).
+  const taken = state.pile.concat([revealed]);
+  const fours = taken.filter((c) => c.rank === '4');
+  const others = taken.filter((c) => c.rank !== '4');
+  const newHand = player.hand.concat(others);
   const newPlayers = state.players.map((p, k) =>
     k === playerIdx ? { ...p, hand: newHand, faceDown: newFaceDown } : p,
   );
   const nextIdx = nextActivePlayerIndex(newPlayers, playerIdx);
   return ok({
     ...state,
-    pile: [],
+    pile: fours,
     players: newPlayers,
     currentPlayerIdx: nextIdx === -1 ? state.currentPlayerIdx : nextIdx,
     quickChainEligible: null,
@@ -717,20 +723,27 @@ function handleJokerChoose(
   const victim = state.players[victimIdx]!;
   if (victim.isOut) return fail('victim is out');
 
-  // The Joker(s) themselves don't go to the victim — they burn. The
-  // victim only swallows the non-Joker cards that were on the pile.
+  // Three buckets:
+  //   - Joker(s) burn (consumed by their own effect).
+  //   - 4s stay on the table — the "4s never go to a hand" rule applies
+  //     to the joker victim too: think of them grabbing the pile and
+  //     bursting any 4s straight back onto a fresh pile.
+  //   - Everything else goes into the victim's hand.
   const jokers = state.pile.filter((c) => c.rank === 'JOKER');
-  const nonJokers = state.pile.filter((c) => c.rank !== 'JOKER');
+  const fours = state.pile.filter((c) => c.rank === '4');
+  const others = state.pile.filter(
+    (c) => c.rank !== 'JOKER' && c.rank !== '4',
+  );
 
   const newPlayers = state.players.map((p, i) =>
-    i === victimIdx ? { ...p, hand: p.hand.concat(nonJokers) } : p,
+    i === victimIdx ? { ...p, hand: p.hand.concat(others) } : p,
   );
 
   const nextIdx = nextActivePlayerIndex(newPlayers, victimIdx);
 
   return ok({
     ...state,
-    pile: [],
+    pile: fours,
     burnedPile: state.burnedPile.concat(jokers),
     players: newPlayers,
     currentPlayerIdx: nextIdx === -1 ? state.currentPlayerIdx : nextIdx,
@@ -759,14 +772,20 @@ function handleTakePile(
   if (player.isOut) return fail('player is out');
   if (state.pile.length === 0) return fail('pile is empty');
 
-  const newHand = player.hand.concat(state.pile);
+  // The "4s never go to a hand" rule: any 4s in the pile stay on the
+  // table as the new pile (think of the taker grabbing everything and
+  // immediately bursting all 4s back onto an empty pile). Only the
+  // non-4 cards land in the taker's hand.
+  const fours = state.pile.filter((c) => c.rank === '4');
+  const others = state.pile.filter((c) => c.rank !== '4');
+  const newHand = player.hand.concat(others);
   const newPlayers = state.players.map((p, i) =>
     i === playerIdx ? { ...p, hand: newHand } : p,
   );
   const nextIdx = nextActivePlayerIndex(newPlayers, playerIdx);
   return ok({
     ...state,
-    pile: [],
+    pile: fours,
     players: newPlayers,
     currentPlayerIdx: nextIdx === -1 ? state.currentPlayerIdx : nextIdx,
     quickChainEligible: null,
@@ -859,14 +878,17 @@ export function applyAutoTakeIfNeeded(
   if (!cur || cur.isOut) return state;
   if (canPlayerPlay(state, state.currentPlayerIdx)) return state;
 
-  const newHand = cur.hand.concat(state.pile);
+  // Same "4s never go to a hand" rule as the manual takePile path.
+  const fours = state.pile.filter((c) => c.rank === '4');
+  const others = state.pile.filter((c) => c.rank !== '4');
+  const newHand = cur.hand.concat(others);
   const newPlayers = state.players.map((p, i) =>
     i === state.currentPlayerIdx ? { ...p, hand: newHand } : p,
   );
   const nextIdx = nextActivePlayerIndex(newPlayers, state.currentPlayerIdx);
   return {
     ...state,
-    pile: [],
+    pile: fours,
     players: newPlayers,
     currentPlayerIdx: nextIdx === -1 ? state.currentPlayerIdx : nextIdx,
     quickChainEligible: null,
