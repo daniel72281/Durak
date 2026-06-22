@@ -500,16 +500,17 @@ function PlayingView({
       </div>
 
       <div className="shi-self">
-        <p className="shi-board-label">
+        <p className="shi-turn-indicator">
           {isMyTurn
             ? t('games.shithead.your_turn')
             : chainArmed
               ? t('games.shithead.quick_chain_open', {
                   rank: state.quickChainEligible?.rank ?? '',
                 })
-              : t('games.shithead.waiting_for_other')}
-          {' · '}
-          {t(`games.shithead.phase_${playerPhase}`)}
+              : t('games.shithead.turn_of', {
+                  nickname:
+                    state.players[state.currentPlayerIdx]?.nickname ?? '?',
+                })}
         </p>
 
         {/* Action row sits ABOVE the cards so the player can always

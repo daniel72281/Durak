@@ -173,6 +173,19 @@
   gap: 8px;
 }
 
+/* Turn indicator sits at the top of the self panel — "Your turn" /
+   "Player X's turn" / quick-chain prompt — in a heftier weight than
+   the rest of the panel labels so players don't have to hunt for
+   whose move it is. */
+.shi-turn-indicator {
+  margin: 0;
+  text-align: center;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #333;
+  letter-spacing: 0.01em;
+}
+
 .shi-hand {
   display: flex;
   flex-wrap: wrap;

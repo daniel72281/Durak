@@ -89,6 +89,7 @@
       "facedown_count": "סגורים {{count}}",
       "your_turn": "תורכם",
       "waiting_for_other": "ממתינים…",
+      "turn_of": "תור {{nickname}}",
       "quick_chain_open": "מהר! זרקו עוד {{rank}} לפני שהשחקן הבא מגיב",
       "notice_auto_take": "{{nickname}} לא יכול להגיב — מרים את הערימה תוך 3 שניות",
       "notice_burn_ten": "🔥 {{nickname}} שיחק 10 — הערימה נשרפה!",

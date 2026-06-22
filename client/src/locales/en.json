@@ -89,6 +89,7 @@
       "facedown_count": "Down {{count}}",
       "your_turn": "Your turn",
       "waiting_for_other": "Waiting…",
+      "turn_of": "{{nickname}}'s turn",
       "quick_chain_open": "Quick! Chain another {{rank}} before the next player plays",
       "notice_auto_take": "{{nickname}} can't respond — taking the pile in 3s",
       "notice_burn_ten": "🔥 {{nickname}} played a 10 — pile burned!",
