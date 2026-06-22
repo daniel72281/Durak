@@ -66,6 +66,11 @@ function RoomPage() {
   const [timedOut, setTimedOut] = useState(false);
   const [showLeave, setShowLeave] = useState(false);
   const [showClose, setShowClose] = useState(false);
+  // Hold off the game-over dialog for a beat after the engine flips
+  // phase to 'finished', so the players can see the final card on the
+  // pile and understand WHY the round ended before the modal covers
+  // the table.
+  const [showGameOver, setShowGameOver] = useState(false);
   // Toast state carries an optional per-message duration so callers can
   // request a longer dwell time when the message is something the player
   // actually needs to read (e.g. the defend-vs-transfer disambiguation).
@@ -170,6 +175,20 @@ function RoomPage() {
     }
     prevReasonRef.current = reason;
   }, [durakGameState, t]);
+
+  // Phase-transition delay: when either game flips to 'finished', hold
+  // the GameOverDialog for ~2.5s so the players can see the final card
+  // on the pile and understand WHY the round ended before the modal
+  // covers the table.
+  const phase = durakGameState?.phase ?? shitheadGameState?.phase ?? null;
+  useEffect(() => {
+    if (phase === 'finished') {
+      const timer = setTimeout(() => setShowGameOver(true), 2500);
+      return () => clearTimeout(timer);
+    }
+    setShowGameOver(false);
+    return undefined;
+  }, [phase]);
 
   // On every (re)connect, try to rejoin the room using saved credentials.
   // This handles transient socket drops AND tab refreshes — the server
@@ -299,7 +318,7 @@ function RoomPage() {
             {t('room.leave_room')}
           </button>
         </div>
-        {durakGameState && durakGameState.phase === 'finished' && (
+        {durakGameState && durakGameState.phase === 'finished' && showGameOver && (
           <GameOverDialog
             state={durakGameState}
             isOwner={roomState.selfPlayerId === roomState.ownerId}
@@ -316,7 +335,7 @@ function RoomPage() {
             }}
           />
         )}
-        {shitheadGameState && shitheadGameState.phase === 'finished' && (
+        {shitheadGameState && shitheadGameState.phase === 'finished' && showGameOver && (
           <ShitheadGameOverDialog
             state={shitheadGameState}
             isOwner={roomState.selfPlayerId === roomState.ownerId}

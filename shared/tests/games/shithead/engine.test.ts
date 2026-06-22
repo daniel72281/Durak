@@ -9,6 +9,7 @@ import {
   createGame,
   startGame,
 } from '../../../src/games/shithead/engine';
+import { computeScoreDeltas } from '../../../src/games/shithead/scoring';
 import type {
   ShitheadAction,
   ShitheadGameState,
@@ -1778,6 +1779,82 @@ describe('Shithead: game-end + restart penalty', () => {
     expect(r.loser).toBe('b');
     expect(r.outOrder).toEqual(['a']);
     expect(r.endReason).toBe('normal');
+  });
+
+  it('scoring: heads-up grants the winner +1 (no podium spread)', () => {
+    // Same finishing scenario as the previous test — A plays the last
+    // K, A wins, B is the shithead. With only 2 players the spread
+    // collapses to +1 / 0.
+    const state = makePlayingState({
+      hands: [[card('K', 'spades')], [card('K', 'clubs')]],
+      faceUp: [[], []],
+      faceDown: [[], []],
+      pile: [card('5', 'hearts')],
+    });
+    const r = unwrap(
+      applyAction(state, {
+        type: 'shi.play',
+        playerId: 'a',
+        source: 'hand',
+        cards: [card('K', 'spades')],
+      }),
+    );
+    const deltas = computeScoreDeltas(r);
+    expect(deltas.get('a')).toBe(1);
+    expect(deltas.get('b')).toBe(0);
+  });
+
+  it('scoring: 3+ players keeps the +2 winner / +1 mid / 0 shithead split', () => {
+    // Build a finished 3-player state directly: A out first, then B,
+    // leaving C as the shithead.
+    const finished: ShitheadGameState = {
+      phase: 'finished',
+      players: [
+        {
+          id: 'a',
+          nickname: 'A',
+          hand: [],
+          faceUp: [],
+          faceDown: [],
+          isOut: true,
+          setupConfirmed: true,
+          forcedFaceUp: false,
+        },
+        {
+          id: 'b',
+          nickname: 'B',
+          hand: [],
+          faceUp: [],
+          faceDown: [],
+          isOut: true,
+          setupConfirmed: true,
+          forcedFaceUp: false,
+        },
+        {
+          id: 'c',
+          nickname: 'C',
+          hand: [card('K', 'clubs')],
+          faceUp: [],
+          faceDown: [],
+          isOut: false,
+          setupConfirmed: true,
+          forcedFaceUp: false,
+        },
+      ],
+      deck: [],
+      pile: [],
+      burnedPile: [],
+      currentPlayerIdx: 2,
+      pendingJokerChooserId: null,
+      quickChainEligible: null,
+      outOrder: ['a', 'b'],
+      loser: 'c',
+      endReason: 'normal',
+    };
+    const deltas = computeScoreDeltas(finished);
+    expect(deltas.get('a')).toBe(2);
+    expect(deltas.get('b')).toBe(1);
+    expect(deltas.get('c')).toBe(0);
   });
 
   it('the previous game\'s shithead has their faceUp dealt randomly and is auto-confirmed', () => {
