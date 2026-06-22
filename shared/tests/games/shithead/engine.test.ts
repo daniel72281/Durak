@@ -1474,6 +1474,135 @@ describe('Shithead: shi.burst with multiple 4s', () => {
     expect(r.ok).toBe(false);
   });
 
+  it('accepts a 4-of-a-kind burn-burst from hand on any pile state', () => {
+    // 3 players. B (not on turn) has all four 6s in hand. Pile top is a
+    // Q (unrelated). B bursts → newPile = [...prevPile, 6,6,6,6] → top
+    // 4 are 6s → burn → B keeps the turn.
+    const state = makePlayingState({
+      hands: [
+        [card('K', 'clubs')],
+        [
+          card('6', 'spades'),
+          card('6', 'hearts'),
+          card('6', 'diamonds'),
+          card('6', 'clubs'),
+        ],
+        [card('A', 'hearts')],
+      ],
+      pile: [card('J', 'spades'), card('Q', 'spades')],
+      currentPlayerIdx: 0,
+    });
+    const r = unwrap(
+      applyAction(state, {
+        type: 'shi.burst',
+        playerId: 'b',
+        source: 'hand',
+        cards: [
+          card('6', 'spades'),
+          card('6', 'hearts'),
+          card('6', 'diamonds'),
+          card('6', 'clubs'),
+        ],
+      }),
+    );
+    expect(r.pile).toHaveLength(0);
+    expect(r.burnedPile.length).toBe(6); // 2 existing + 4 sixes
+    expect(r.currentPlayerIdx).toBe(1); // burster keeps turn (burn)
+  });
+
+  it('accepts a complete-the-run burst (1×6 on pile + 3×6 in hand)', () => {
+    const state = makePlayingState({
+      hands: [
+        [card('K', 'clubs')],
+        [
+          card('6', 'spades'),
+          card('6', 'hearts'),
+          card('6', 'diamonds'),
+        ],
+        [],
+      ],
+      pile: [card('6', 'clubs')], // single 6 sitting on top
+      currentPlayerIdx: 0,
+    });
+    const r = unwrap(
+      applyAction(state, {
+        type: 'shi.burst',
+        playerId: 'b',
+        source: 'hand',
+        cards: [
+          card('6', 'spades'),
+          card('6', 'hearts'),
+          card('6', 'diamonds'),
+        ],
+      }),
+    );
+    expect(r.pile).toHaveLength(0);
+    expect(r.burnedPile.length).toBe(4);
+    expect(r.currentPlayerIdx).toBe(1);
+  });
+
+  it('accepts a complete-the-run burst (2×7 pile + 2×7 hand)', () => {
+    const state = makePlayingState({
+      hands: [
+        [card('K', 'clubs')],
+        [card('7', 'spades'), card('7', 'hearts')],
+      ],
+      pile: [card('7', 'clubs'), card('7', 'diamonds')],
+      currentPlayerIdx: 0,
+    });
+    const r = unwrap(
+      applyAction(state, {
+        type: 'shi.burst',
+        playerId: 'b',
+        source: 'hand',
+        cards: [card('7', 'spades'), card('7', 'hearts')],
+      }),
+    );
+    expect(r.pile).toHaveLength(0);
+    expect(r.burnedPile.length).toBe(4);
+    expect(r.currentPlayerIdx).toBe(1);
+  });
+
+  it('accepts a complete-the-run burst (3×5 pile + 1×5 hand)', () => {
+    const state = makePlayingState({
+      hands: [
+        [card('K', 'clubs')],
+        [card('5', 'spades')],
+      ],
+      pile: [card('5', 'clubs'), card('5', 'diamonds'), card('5', 'hearts')],
+      currentPlayerIdx: 0,
+    });
+    const r = unwrap(
+      applyAction(state, {
+        type: 'shi.burst',
+        playerId: 'b',
+        source: 'hand',
+        cards: [card('5', 'spades')],
+      }),
+    );
+    expect(r.pile).toHaveLength(0);
+    expect(r.burnedPile.length).toBe(4);
+    expect(r.currentPlayerIdx).toBe(1);
+  });
+
+  it('rejects a non-4 burst that would NOT complete a four-in-a-row', () => {
+    // Pile has a 6 + a Q. Hand has 2×6 only — not enough.
+    const state = makePlayingState({
+      hands: [
+        [card('K', 'clubs')],
+        [card('6', 'spades'), card('6', 'hearts')],
+      ],
+      pile: [card('6', 'clubs'), card('Q', 'diamonds')],
+    });
+    const r = applyAction(state, {
+      type: 'shi.burst',
+      playerId: 'b',
+      source: 'hand',
+      cards: [card('6', 'spades'), card('6', 'hearts')],
+    });
+    expect(r.ok).toBe(false);
+  });
+
   it('rejects a burst that mixes 4s with another rank', () => {
     const state = makePlayingState({
       hands: [

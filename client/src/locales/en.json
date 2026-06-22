@@ -104,6 +104,8 @@
       "burst_with_4": "Burst with 4",
       "burst_with_4_hint": "Play a 4 out of turn when the pile is empty",
       "burst_no_four": "No 4 in hand",
+      "burn_burst_button": "🔥 Burst & Burn ({{rank}})",
+      "burn_burst_hint": "You can burn with {{rank}} — tap Burst & Burn fast!",
       "facedown_reveal": "Reveal",
       "facedown_reveal_hint": "Tap a face-down card to reveal it blind",
       "joker_pick_victim": "Pick a player to swallow the pile",

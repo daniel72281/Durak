@@ -555,12 +555,6 @@ function handleBurst(
   if (state.pendingJokerChooserId !== null) {
     return fail('joker chooser must pick a victim first');
   }
-  // Burst is legal on an empty pile OR when the pile contains nothing
-  // but 4s — that's the "burst chain" window opened by an earlier
-  // burster. As soon as any non-4 lands on top, the window closes.
-  if (state.pile.length > 0 && state.pile.some((c) => c.rank !== '4')) {
-    return fail('burst requires an empty pile or an all-4s pile');
-  }
 
   const playerIdx = state.players.findIndex((p) => p.id === action.playerId);
   if (playerIdx === -1) return fail('player not in game');
@@ -569,8 +563,36 @@ function handleBurst(
 
   const cards = action.cards;
   if (cards.length === 0) return fail('must burst at least one card');
+  const rank = cards[0]!.rank;
   for (const c of cards) {
-    if (c.rank !== '4') return fail('burst cards must all be 4s');
+    if (c.rank !== rank) return fail('burst cards must all share a rank');
+  }
+
+  // Two flavors of burst are accepted out of turn:
+  //
+  //   (a) Classic 4-burst: the cards are all 4s AND the pile is empty
+  //       or holds nothing but 4s (an open burst chain). May or may
+  //       not trigger a burn — even a single 4 on an empty pile is a
+  //       valid out-of-turn interruption.
+  //
+  //   (b) Burn-burst: the cards' rank lines up with the run already at
+  //       the top of the pile, and after placing them the top 4 cards
+  //       share that rank — completing a four-in-a-row and burning
+  //       the pile. Works for ANY rank, not just 4s. Example: 1×6 on
+  //       the pile + 3×6 in hand → place 3, top 4 are 6s → burn.
+  //
+  // pileHasFourInARow does the literal-rank scan so it captures every
+  // shape (4-of-a-kind from hand, partial run completion, all-on-pile
+  // already, etc.).
+  const candidatePile = state.pile.concat(cards);
+  const wouldBurn = pileHasFourInARow(candidatePile);
+  const isClassicFourBurst =
+    rank === '4' &&
+    (state.pile.length === 0 || state.pile.every((c) => c.rank === '4'));
+  if (!wouldBurn && !isClassicFourBurst) {
+    return fail(
+      'burst must be 4s on an empty/all-4s pile or complete a four-in-a-row',
+    );
   }
 
   // Source can be hand or faceUp. faceUp burst is only allowed when the
@@ -610,18 +632,17 @@ function handleBurst(
     i === playerIdx ? { ...p, hand: newHand, faceUp: newFaceUp } : p,
   );
 
-  // Place the burst cards on top of whatever 4s are already there
-  // (chain bursts) and apply the four-in-a-row burn rule. When the pile
-  // hits 4× 4s the rule fires, the pile burns, and the burster keeps
-  // their turn. Otherwise the pile stays put and the turn passes to the
-  // player AFTER the burster (out-of-turn nature of the burst).
-  let newPile: Card[] = state.pile.concat(cards);
+  // Apply the burst. The candidate pile is what wouldBurn was checked
+  // against above — if it burns, sweep everything to burnedPile and the
+  // burster keeps the turn; otherwise the pile stays put and the turn
+  // passes to the player AFTER the burster (out-of-turn nature of the
+  // burst).
+  let newPile: Card[] = candidatePile;
   let newBurned = state.burnedPile;
-  let burned = false;
-  if (pileHasFourInARow(newPile)) {
+  const burned = wouldBurn;
+  if (burned) {
     newBurned = newBurned.concat(newPile);
     newPile = [];
-    burned = true;
   }
 
   let nextIdx: number;

@@ -9,7 +9,7 @@
 // to make the game playable end-to-end. Polish (animations, sortable
 // hand, drag-drop) can come after the first multiplayer playtest.
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Card } from '@shared/types';
 import type {
@@ -46,6 +46,44 @@ function sortCards(cards: readonly Card[]): Card[] {
     if (r !== 0) return r;
     return SUIT_ORDER[a.suit] - SUIT_ORDER[b.suit];
   });
+}
+
+// Build the burn-burst option from a source of cards: find any rank
+// where (cards of that rank you own) + (matching-rank run at the top of
+// the pile) >= 4. With 4 cards per rank in the deck, there's never a
+// "use only some" choice — the player either has exactly enough or not.
+//
+// Returns the cards to burst with, or null if no rank can complete the
+// run. When multiple ranks qualify, prefers the lowest rank so the
+// player spends the least valuable cards.
+function findBurnBurst(
+  source: readonly Card[],
+  pile: readonly Card[],
+): Card[] | null {
+  if (source.length === 0) return null;
+  const topRank = pile.length > 0 ? pile[pile.length - 1]!.rank : null;
+  let topRun = 0;
+  if (topRank) {
+    for (let i = pile.length - 1; i >= 0; i--) {
+      if (pile[i]!.rank === topRank) topRun++;
+      else break;
+    }
+  }
+  const groups = new Map<Card['rank'], Card[]>();
+  for (const c of source) {
+    const g = groups.get(c.rank);
+    if (g) g.push(c);
+    else groups.set(c.rank, [c]);
+  }
+  let best: { rank: Card['rank']; cards: Card[] } | null = null;
+  for (const [rank, group] of groups) {
+    const run = topRank === rank ? topRun : 0;
+    if (group.length + run < 4) continue;
+    if (best === null || RANK_ORDER[rank] < RANK_ORDER[best.rank]) {
+      best = { rank, cards: group };
+    }
+  }
+  return best?.cards ?? null;
 }
 
 // How many cards of the SAME literal rank sit at the top of the pile?
@@ -247,6 +285,37 @@ function PlayingView({
     state.selfFaceUp.length,
     state.selfFaceDownCount,
   ]);
+
+  // Burn-burst opportunity. Hand takes precedence; faceUp only counts
+  // once the player is in faceUp phase (no hand, no deck). When it's
+  // available the second "פרוץ ושרוף" button shows up and a toast pops
+  // to nudge the player to race the next play.
+  const burnBurst = useMemo<
+    { cards: Card[]; source: 'hand' | 'faceUp' } | null
+  >(() => {
+    const fromHand = findBurnBurst(state.selfHand, state.pile);
+    if (fromHand) return { cards: fromHand, source: 'hand' };
+    if (state.selfHand.length === 0 && state.deckCount === 0) {
+      const fromFaceUp = findBurnBurst(state.selfFaceUp, state.pile);
+      if (fromFaceUp) return { cards: fromFaceUp, source: 'faceUp' };
+    }
+    return null;
+  }, [state.selfHand, state.selfFaceUp, state.pile, state.deckCount]);
+
+  // Fire a one-shot toast the moment a burn-burst becomes available so
+  // the player notices before the next action closes the window.
+  const prevBurnAvailable = useRef(false);
+  useEffect(() => {
+    const nowAvailable = burnBurst !== null;
+    if (nowAvailable && !prevBurnAvailable.current) {
+      onShowError(
+        t('games.shithead.burn_burst_hint', {
+          rank: burnBurst!.cards[0]!.rank,
+        }),
+      );
+    }
+    prevBurnAvailable.current = nowAvailable;
+  }, [burnBurst, onShowError, t]);
 
   // Look up a Card by its cardKey from the actor's authoritative hand /
   // faceUp. Returns null when the key has gone stale (the card was
@@ -545,6 +614,27 @@ function PlayingView({
           >
             {t('games.shithead.burst_with_4')}
           </button>
+          {burnBurst && (
+            <button
+              type="button"
+              className="primary burn-burst"
+              onClick={() => {
+                onAction({
+                  type: 'shi.burst',
+                  playerId: selfId,
+                  source: burnBurst.source,
+                  cards: burnBurst.cards,
+                });
+              }}
+              title={t('games.shithead.burn_burst_hint', {
+                rank: burnBurst.cards[0]!.rank,
+              })}
+            >
+              {t('games.shithead.burn_burst_button', {
+                rank: burnBurst.cards[0]!.rank,
+              })}
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -233,6 +233,27 @@
   min-width: 140px;
 }
 
+/* Burn-burst is the "race to finish a 4-in-a-row" button. Painted hot
+   so the player notices the window is open. Slight pulse keeps it from
+   blending into the regular Play button. */
+.shi-actions button.burn-burst {
+  background: linear-gradient(135deg, #ef4444, #f59e0b);
+  color: #fff;
+  border: none;
+  font-weight: 700;
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px #ef444466;
+  animation: burn-burst-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes burn-burst-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 2px #fff, 0 0 0 4px #ef444466;
+  }
+  50% {
+    box-shadow: 0 0 0 2px #fff, 0 0 0 8px #ef4444aa;
+  }
+}
+
 /* ---- joker chooser ---- */
 
 .shi-joker-overlay {

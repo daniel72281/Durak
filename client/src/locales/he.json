@@ -104,6 +104,8 @@
       "burst_with_4": "פרוץ עם 4",
       "burst_with_4_hint": "זרוק 4 מחוץ לתור כשהערימה ריקה",
       "burst_no_four": "אין 4 ביד",
+      "burn_burst_button": "🔥 פרוץ ושרוף ({{rank}})",
+      "burn_burst_hint": "אתה יכול לשרוף עם {{rank}} — לחץ מהר 'פרוץ ושרוף'!",
       "facedown_reveal": "חשוף",
       "facedown_reveal_hint": "לחצו על קלף סגור לחשיפה עיוורת",
       "joker_pick_victim": "בחרו שחקן שיבלע את הערימה",
