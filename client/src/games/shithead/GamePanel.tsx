@@ -17,6 +17,7 @@ import type {
   ShitheadClientGameState,
   ShitheadPublicPlayer,
 } from '@shared/games/shithead';
+import { pileHasFourInARow } from '@shared/games/shithead/rules';
 import CardSvg from '../../components/CardSvg';
 import './GamePanel.css';
 
@@ -48,14 +49,16 @@ function sortCards(cards: readonly Card[]): Card[] {
   });
 }
 
-// Build the burn-burst option from a source of cards: find any rank
-// where (cards of that rank you own) + (matching-rank run at the top of
-// the pile) >= 4. With 4 cards per rank in the deck, there's never a
-// "use only some" choice — the player either has exactly enough or not.
-//
-// Returns the cards to burst with, or null if no rank can complete the
-// run. When multiple ranks qualify, prefers the lowest rank so the
-// player spends the least valuable cards.
+// Build the auto burn-burst option from a source of cards: find any
+// rank where (cards of that rank you own) + (matching-rank run at the
+// top of the pile) >= 4. Ranks '2' and '3' are skipped on purpose —
+// they're "magic" cards (reset + mirror) that players almost always
+// want to keep for their effects, and auto-burning them was a common
+// regret. Among the remaining ranks, prefers the lowest so the player
+// spends the least valuable cards. Returns null when no rank can
+// complete a four-in-a-row without using 2s or 3s — in that case the
+// player can still burn via the manual-selection override
+// (selectionWouldBurn).
 function findBurnBurst(
   source: readonly Card[],
   pile: readonly Card[],
@@ -77,6 +80,7 @@ function findBurnBurst(
   }
   let best: { rank: Card['rank']; cards: Card[] } | null = null;
   for (const [rank, group] of groups) {
+    if (rank === '2' || rank === '3') continue;
     const run = topRank === rank ? topRun : 0;
     if (group.length + run < 4) continue;
     if (best === null || RANK_ORDER[rank] < RANK_ORDER[best.rank]) {
@@ -84,6 +88,23 @@ function findBurnBurst(
     }
   }
   return best?.cards ?? null;
+}
+
+// Manual-selection override for burn-burst. When the player explicitly
+// picks cards (via the existing toggleHand/toggleFaceUp UI), the burn
+// button uses THIS check instead of the auto picker — letting them
+// burn ranks the auto path skips on purpose (e.g. deliberately burning
+// 2s/3s) or high-value ranks they prefer over the auto choice.
+function selectionWouldBurn(
+  selected: readonly Card[],
+  pile: readonly Card[],
+): boolean {
+  if (selected.length === 0) return false;
+  const rank = selected[0]!.rank;
+  for (const c of selected) {
+    if (c.rank !== rank) return false;
+  }
+  return pileHasFourInARow([...pile, ...selected]);
 }
 
 // How many cards of the SAME literal rank sit at the top of the pile?
@@ -293,6 +314,26 @@ function PlayingView({
   const burnBurst = useMemo<
     { cards: Card[]; source: 'hand' | 'faceUp' } | null
   >(() => {
+    // Priority 1: the player's manual selection, when it would burn.
+    // Letting selection win means the player can burn 2s/3s on
+    // purpose, or pick a different rank than the auto path's choice.
+    if (selectedHandKeys.length > 0) {
+      const cards = selectedHandKeys
+        .map((k) => state.selfHand.find((c) => cardKey(c) === k))
+        .filter((c): c is Card => c !== undefined);
+      if (selectionWouldBurn(cards, state.pile)) {
+        return { cards, source: 'hand' };
+      }
+    }
+    if (selectedFaceUpKeys.length > 0) {
+      const cards = selectedFaceUpKeys
+        .map((k) => state.selfFaceUp.find((c) => cardKey(c) === k))
+        .filter((c): c is Card => c !== undefined);
+      if (selectionWouldBurn(cards, state.pile)) {
+        return { cards, source: 'faceUp' };
+      }
+    }
+    // Priority 2: auto-detected burn (lowest non-2/non-3 rank).
     const fromHand = findBurnBurst(state.selfHand, state.pile);
     if (fromHand) return { cards: fromHand, source: 'hand' };
     if (state.selfHand.length === 0 && state.deckCount === 0) {
@@ -300,7 +341,14 @@ function PlayingView({
       if (fromFaceUp) return { cards: fromFaceUp, source: 'faceUp' };
     }
     return null;
-  }, [state.selfHand, state.selfFaceUp, state.pile, state.deckCount]);
+  }, [
+    state.selfHand,
+    state.selfFaceUp,
+    state.pile,
+    state.deckCount,
+    selectedHandKeys,
+    selectedFaceUpKeys,
+  ]);
 
   // Fire a one-shot toast the moment a burn-burst becomes available so
   // the player notices before the next action closes the window.
