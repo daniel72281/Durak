@@ -127,6 +127,17 @@ function commitScoreIfFinished(room: rooms.Room): void {
 function broadcastGameState(roomId: string): void {
   const room = rooms.getRoom(roomId);
   if (!room || !room.game) return;
+  broadcastGameStateOverride(roomId, room.game);
+}
+
+// Like broadcastGameState, but uses the provided `overrideGame` instead
+// of `room.game`. Used by the Shithead burn-reveal pattern: the
+// authoritative state in room.game has already cleared the pile, but
+// for ~1.5s we ship clients a "pre-burn" view that still shows the
+// cards on top so spectators can actually see what got burned.
+function broadcastGameStateOverride(roomId: string, overrideGame: unknown): void {
+  const room = rooms.getRoom(roomId);
+  if (!room) return;
   commitScoreIfFinished(room);
   const engine = engineFor(room);
   const deadline = getTurnDeadline(roomId);
@@ -136,7 +147,7 @@ function broadcastGameState(roomId: string): void {
   for (const player of room.players) {
     if (player.disconnected) continue;
     const view = engine.filterForPlayer(
-      room.game,
+      overrideGame,
       player.id,
       room.id,
       deadline,
@@ -189,6 +200,16 @@ function maybeAnnounceShitheadBurn(
   });
 }
 
+// Shithead burn-reveal: the engine clears the pile inline as part of
+// 10-burns and four-in-a-row burns, but players need to actually SEE
+// what got burned (which 10, which four-of-a-kind, etc.). The server
+// stages a "pre-burn" broadcast — the same authoritative state, but
+// with the just-burned cards held on the pile — then schedules the
+// real (post-burn) broadcast after a short pause. Cancelled if any
+// follow-up action arrives in the meantime (the actor wants to keep
+// playing; skip straight to the post-action state).
+const BURN_REVEAL_DELAY_MS = 1500;
+
 // Shithead's auto-take: when the current actor has no legal play and the
 // pile is non-empty, the engine no longer takes the pile inline (so the
 // state ships unchanged after the action). The server schedules the
@@ -196,6 +217,45 @@ function maybeAnnounceShitheadBurn(
 // "X cannot respond — taking pile in 3s" before the pile actually moves.
 // Cancelled if any other action arrives in the meantime.
 const AUTO_TAKE_DELAY_MS = 3000;
+
+// Stage a pre-burn view of the just-applied state. The cards the engine
+// moved into burnedPile this action are temporarily re-placed on top of
+// the pile (for display only); after BURN_REVEAL_DELAY_MS the real
+// state is re-broadcast. Returns true when staging happened (so the
+// caller can skip the regular broadcast), false otherwise.
+function maybeStageBurnReveal(
+  room: rooms.Room,
+  before: ShitheadGameState,
+  after: ShitheadGameState,
+): boolean {
+  // Both shi.play and shi.burst can trigger an inline burn — the
+  // signature is "pile is empty AND burnedPile grew". Joker.choose
+  // also lands the Joker into burnedPile, but the pile already empty
+  // there is the chooser's normal behavior, not a burn animation.
+  // We use the action context in the caller to gate this.
+  if (after.burnedPile.length <= before.burnedPile.length) return false;
+  if (after.pile.length !== 0) return false;
+
+  const justBurned = after.burnedPile.slice(before.burnedPile.length);
+  const preBurnGame: ShitheadGameState = {
+    ...after,
+    pile: justBurned,
+    burnedPile: before.burnedPile,
+  };
+
+  if (room.burnRevealTimer) {
+    clearTimeout(room.burnRevealTimer);
+    room.burnRevealTimer = null;
+  }
+  broadcastGameStateOverride(room.id, preBurnGame);
+  room.burnRevealTimer = setTimeout(() => {
+    const r = rooms.getRoom(room.id);
+    if (!r) return;
+    r.burnRevealTimer = null;
+    broadcastGameState(r.id);
+  }, BURN_REVEAL_DELAY_MS);
+  return true;
+}
 
 function maybeScheduleAutoTake(room: rooms.Room): void {
   if (room.autoTakeTimer) {
@@ -428,6 +488,13 @@ io.on('connection', (socket) => {
     // but that's not a "pile burn" in the user-facing sense, so it's
     // excluded below.
     const preActionGame = room.game;
+    // Cancel any pending burn-reveal — the new action supersedes the
+    // staged display; the actor (typically the burster) wants to keep
+    // playing, so jump straight to the post-action state.
+    if (room.burnRevealTimer) {
+      clearTimeout(room.burnRevealTimer);
+      room.burnRevealTimer = null;
+    }
     const result = engine.applyAction(room.game, action);
     if (!result.ok) return ack({ ok: false, error: result.error });
     room.game = result.state;
@@ -437,7 +504,31 @@ io.on('connection', (socket) => {
       clearTurnTimer(room.id);
     }
     ack({ ok: true });
-    broadcastGameState(room.id);
+
+    // Shithead-only: when the action burned the pile (10 or 4-in-row /
+    // 4-of-a-kind), broadcast a "pre-burn" view first so players can
+    // actually see the cards that triggered the burn. The real state
+    // is re-broadcast after BURN_REVEAL_DELAY_MS. shi.joker.choose is
+    // excluded because the Joker landing in burnedPile isn't visually
+    // a "burn" — the pile naturally empties as part of the choice.
+    const actionType = (action as { type?: string }).type ?? '';
+    const isBurnCapableAction =
+      actionType === 'shi.play' ||
+      actionType === 'shi.burst' ||
+      actionType === 'shi.playFaceDown';
+    const staged =
+      room.gameType === 'shithead' &&
+      preActionGame !== null &&
+      isBurnCapableAction &&
+      maybeStageBurnReveal(
+        room,
+        preActionGame as ShitheadGameState,
+        result.state as ShitheadGameState,
+      );
+    if (!staged) {
+      broadcastGameState(room.id);
+    }
+
     if (room.gameType === 'shithead' && preActionGame) {
       maybeAnnounceShitheadBurn(
         room,

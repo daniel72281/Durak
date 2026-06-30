@@ -43,6 +43,13 @@ export interface Room {
   // 3-second notice so spectators can read what's happening. Cleared
   // when any subsequent action arrives or the timer fires.
   autoTakeTimer: NodeJS.Timeout | null;
+  // Shithead-only: pending pile-burn reveal timer. When the engine
+  // burns the pile inline, the server stages a "pre-burn" broadcast
+  // (the burned cards still visible on the pile) and schedules this
+  // timer to re-broadcast the real (post-burn) state ~1.5s later so
+  // players actually see WHAT got burned. Cancelled when any
+  // subsequent action arrives or the timer fires.
+  burnRevealTimer: NodeJS.Timeout | null;
 }
 
 const rooms = new Map<string, Room>();
@@ -105,6 +112,7 @@ export function createRoom(
     scoredCurrentGame: false,
     disconnectTimers: new Map(),
     autoTakeTimer: null,
+    burnRevealTimer: null,
   });
   playerToRoom.set(playerId, roomId);
   return { ok: true, roomId, playerId };
@@ -176,6 +184,10 @@ export function closeRoom(roomId: string): void {
   if (room.autoTakeTimer) {
     clearTimeout(room.autoTakeTimer);
     room.autoTakeTimer = null;
+  }
+  if (room.burnRevealTimer) {
+    clearTimeout(room.burnRevealTimer);
+    room.burnRevealTimer = null;
   }
   for (const player of room.players) {
     playerToRoom.delete(player.id);
