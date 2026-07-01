@@ -40,51 +40,55 @@
   width: clamp(58px, 11vw, 86px);
   aspect-ratio: 167 / 242;
   border-radius: 7px;
+  /* Classic card-back: deep red with a fine diagonal weave and a gold
+     outer frame. The weave uses two crossing repeating gradients so it
+     reads as a texture at any size (no single dominating glyph like the
+     old ♦ which turned into a "floating yellow diamond" on small
+     cards). */
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(0, 0, 0, 0.2)),
-    repeating-linear-gradient(45deg, #6a1414 0 6px, #8a1c1c 6px 12px);
-  border: 1px solid rgba(0, 0, 0, 0.7);
+    repeating-linear-gradient(45deg, transparent 0 3px, rgba(255, 220, 120, 0.16) 3px 5px),
+    repeating-linear-gradient(-45deg, transparent 0 3px, rgba(0, 0, 0, 0.18) 3px 5px),
+    linear-gradient(135deg, #9b1c1c, #5a1010);
+  border: 2px solid #f4d35e;
   box-shadow:
-    inset 0 0 0 3px #f4d35e,
-    inset 0 0 0 4px #6a1414,
+    inset 0 0 0 1px rgba(0, 0, 0, 0.6),
     0 2px 5px rgba(0, 0, 0, 0.45);
   position: relative;
   display: inline-block;
   flex-shrink: 0;
+  overflow: hidden;
 }
 
+/* Inner ornamental frame — a thin gold rectangle inset from the edge.
+   Purely decorative; keeps the back looking like a real card. Hidden on
+   very small variants where the frame just adds visual noise. */
 .shi-cardback::after {
-  content: '♦';
+  content: '';
   position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  font-size: clamp(18px, 3vw, 28px);
-  color: #f4d35e;
-  text-shadow: 0 0 6px rgba(0, 0, 0, 0.5);
+  inset: 12%;
+  border: 1px solid rgba(244, 211, 94, 0.55);
+  border-radius: 3px;
+  pointer-events: none;
 }
 
 .shi-cardback.small {
   width: clamp(38px, 6.5vw, 50px);
   border-radius: 5px;
-  box-shadow:
-    inset 0 0 0 2px #f4d35e,
-    inset 0 0 0 3px #6a1414,
-    0 1px 3px rgba(0, 0, 0, 0.4);
+  border-width: 1.5px;
 }
-.shi-cardback.small::after { font-size: 14px; }
+.shi-cardback.small::after {
+  inset: 15%;
+  border-color: rgba(244, 211, 94, 0.45);
+}
 
 .shi-cardback.tiny {
   width: 22px;
   height: 32px;
   aspect-ratio: auto;
   border-radius: 3px;
-  box-shadow:
-    inset 0 0 0 1px #f4d35e,
-    inset 0 0 0 2px #6a1414,
-    0 1px 2px rgba(0, 0, 0, 0.4);
+  border-width: 1px;
 }
-.shi-cardback.tiny::after { font-size: 9px; }
+.shi-cardback.tiny::after { content: none; }
 
 /* ---- top: opponent area ---- */
 
@@ -158,20 +162,24 @@
   margin-inline-start: 4px;
 }
 
-/* Per-player table area: face-down stacks with face-up cards overlaid.
-   The face-down peeks out at the bottom so even after the face-up is
-   played the slot stays visually anchored. */
+/* Per-player table area. Each "slot" is TALLER than a single card so
+   the face-down (top) and face-up (offset ~40% down) can both stay
+   visible simultaneously. After the face-up is played only the
+   face-down remains — the slot geometry doesn't shift, keeping the
+   layout stable. */
 .shi-tableau {
   display: flex;
-  gap: 4px;
-  min-height: 90px;
-  align-items: flex-end;
+  gap: 6px;
+  align-items: flex-start;
+  justify-content: center;
 }
 
 .shi-slot {
   position: relative;
-  width: clamp(42px, 8vw, 60px);
-  height: clamp(60px, 12vw, 86px);
+  width: clamp(48px, 9vw, 66px);
+  /* Card aspect 167/242 → height ≈ width * 1.45.
+     Slot height reserves an extra ~45% for the face-up overhang. */
+  height: clamp(100px, 19vw, 138px);
   flex-shrink: 0;
 }
 
@@ -183,13 +191,19 @@
   position: absolute;
   top: 0;
   left: 0;
+  width: 100%;
   z-index: 1;
 }
 
+/* Face-up sits ~40% down so the top ~40% of the face-down card is
+   always visible above it. When the face-up is played (removed from
+   the DOM) the face-down doesn't shift — it just becomes fully
+   exposed at the top of the slot. */
 .shi-slot-faceup {
   position: absolute;
-  top: 10px; /* offsets down so face-down peeks at the top edge */
-  left: 4px;
+  top: 40%;
+  left: 0;
+  width: 100%;
   z-index: 2;
   animation: cardLand 0.35s ease-out;
 }
@@ -546,19 +560,18 @@
 .shi-self-tableau {
   display: flex;
   justify-content: center;
-  gap: 6px;
-  min-height: 120px;
-  align-items: flex-end;
+  gap: 8px;
+  align-items: flex-start;
 }
 
 .shi-self-tableau .shi-slot {
-  width: clamp(64px, 12vw, 92px);
-  height: clamp(94px, 17vw, 134px);
+  width: clamp(70px, 14vw, 96px);
+  height: clamp(148px, 28vw, 202px);
 }
 
 .shi-self-tableau .shi-slot-faceup {
-  top: 14px;
-  left: 6px;
+  top: 40%;
+  left: 0;
 }
 
 .shi-self-tableau.faceup-active .shi-slot-faceup {
