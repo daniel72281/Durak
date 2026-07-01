@@ -5,9 +5,12 @@
 //             and the magic-card effects
 //   - finished show the shithead (loser)
 //
-// We keep the rendering deliberately compact — Stage 5 is the minimum
-// to make the game playable end-to-end. Polish (animations, sortable
-// hand, drag-drop) can come after the first multiplayer playtest.
+// Visual model: a casino-green "felt table". Each opponent occupies a
+// spot around the rim with their face-down stack (always visible) and
+// face-up cards layered on top. The communal piles (deck / pile /
+// burned) sit in the center. The self area at the bottom mirrors the
+// opponent tableau — face-down + face-up stacks on the table, hand
+// fanned below as the interactive row.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -108,12 +111,6 @@ function selectionWouldBurn(
 }
 
 // How many cards of the SAME literal rank sit at the top of the pile?
-// Helps the UI flag two things at a glance:
-//   - how many cards the previous actor just laid down together
-//   - how close the pile is to a four-in-a-row burn (4 - runCount more
-//     of the same rank ends the round)
-// Strictly literal rank equality (K==K, 5==5, JOKER==JOKER) — 3s on top
-// don't merge with the rank under them, they break the run.
 function topRunCount(pile: readonly Card[]): number {
   if (pile.length === 0) return 0;
   const topRank = pile[pile.length - 1]!.rank;
@@ -125,21 +122,175 @@ function topRunCount(pile: readonly Card[]): number {
   return count;
 }
 
+// ---------------------------------------------------------------------------
+// Visual primitives: card back + the four kinds of card piles.
+// ---------------------------------------------------------------------------
+
+function CardBack({ size = 'normal' }: { size?: 'normal' | 'small' | 'tiny' }) {
+  const cls = size === 'normal' ? 'shi-cardback' : `shi-cardback ${size}`;
+  return <span className={cls} aria-hidden="true" />;
+}
+
+// Visual stack representing the deck draw pile. Renders up to 3 layered
+// card backs (depth illusion) with the live count badge in the corner.
+function DeckStack({ count }: { count: number }) {
+  if (count === 0) {
+    return (
+      <div className="shi-deck-empty">
+        <span>—</span>
+      </div>
+    );
+  }
+  const layers = Math.min(3, count);
+  return (
+    <div className="shi-deck-stack">
+      {Array.from({ length: layers }).map((_, i) => (
+        <CardBack key={i} />
+      ))}
+      <span className="shi-count-badge">{count}</span>
+    </div>
+  );
+}
+
+// Pile stack: top card shown face-up, with offset "edges" peeking from
+// underneath to convey depth (capped at 2 visible edges).
+function PileStack({ pile }: { pile: readonly Card[] }) {
+  if (pile.length === 0) return null;
+  const top = pile[pile.length - 1]!;
+  // Use the cardKey of the top card as a stable React key so the
+  // cardLand animation only fires when the top actually changes.
+  const edges = Math.min(2, pile.length - 1);
+  return (
+    <div className="shi-pile-stack">
+      {Array.from({ length: edges }).map((_, i) => (
+        <div
+          key={`edge-${i}`}
+          className="shi-pile-edge"
+          style={{ transform: `translate(${-(i + 1) * 2}px, ${(i + 1) * 2}px)` }}
+        />
+      ))}
+      <div key={cardKey(top)} className="shi-pile-top">
+        <CardSvg card={top} />
+      </div>
+      {topRunCount(pile) > 1 && (
+        <span className="shi-pile-run" aria-label="same-rank run">
+          ×{topRunCount(pile)}
+        </span>
+      )}
+    </div>
+  );
+}
+
+// Burned pile — darkened card silhouettes with a flame mark. Pile is
+// out of play forever; only the count matters.
+function BurnedStack({ count }: { count: number }) {
+  if (count === 0) return <div className="shi-burned-empty" />;
+  const layers = Math.min(3, count);
+  return (
+    <div className="shi-burned-stack">
+      {Array.from({ length: layers }).map((_, i) => (
+        <div key={i} className="shi-burned-card" />
+      ))}
+      <span className="shi-count-badge">{count}</span>
+    </div>
+  );
+}
+
+// Per-player tableau: a row of slots, each containing a face-down card
+// back at the bottom and a face-up card overlaid on top. The face-down
+// always renders if the player still owns a face-down at that index, so
+// the slot stays visually anchored on the table even after the face-up
+// above it has been played.
+//
+// Layout: max(faceUp.length, faceDownCount) slots side by side. The
+// face-up array indices map 1:1 to the leftmost slots (we don't know
+// which face-down the engine paired them with, but visually showing
+// face-up over face-down at the same position is the natural Shithead
+// convention).
+function PlayerTableau({
+  faceUp,
+  faceDownCount,
+  faceUpVariant,
+  facedownClass,
+  faceupClass,
+  onFaceUpClick,
+  onFaceDownClick,
+  selectedKeys,
+}: {
+  faceUp: readonly Card[];
+  faceDownCount: number;
+  faceUpVariant?: 'face' | 'small';
+  facedownClass?: (i: number) => string;
+  faceupClass?: (c: Card) => string;
+  onFaceUpClick?: (c: Card) => void;
+  onFaceDownClick?: (i: number) => void;
+  selectedKeys?: readonly string[];
+}) {
+  const slots = Math.max(faceUp.length, faceDownCount);
+  if (slots === 0) return null;
+  return (
+    <div className="shi-tableau">
+      {Array.from({ length: slots }).map((_, i) => {
+        const faceUpCard = i < faceUp.length ? faceUp[i] : null;
+        const showFaceDown = i < faceDownCount;
+        const fdCls = `shi-slot-facedown ${facedownClass ? facedownClass(i) : ''}`;
+        const fuPicked = faceUpCard && selectedKeys?.includes(cardKey(faceUpCard));
+        const fuCls = `shi-slot-faceup ${fuPicked ? 'picked' : ''} ${faceUpCard && faceupClass ? faceupClass(faceUpCard) : ''}`;
+        return (
+          <div className="shi-slot" key={i}>
+            {showFaceDown && (
+              <div
+                className={fdCls}
+                onClick={onFaceDownClick ? () => onFaceDownClick(i) : undefined}
+              >
+                <CardBack />
+              </div>
+            )}
+            {faceUpCard && (
+              <div
+                className={fuCls}
+                onClick={onFaceUpClick ? () => onFaceUpClick(faceUpCard) : undefined}
+              >
+                <CardSvg card={faceUpCard} variant={faceUpVariant} />
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Opponent's "hand": small fanned card backs to show count at a glance.
+// Capped at 5 visible — beyond that we just show the number.
+function OpponentHand({ count }: { count: number }) {
+  const visible = Math.min(5, count);
+  return (
+    <div className="shi-opponent-hand">
+      {Array.from({ length: visible }).map((_, i) => (
+        <CardBack key={i} size="tiny" />
+      ))}
+      {count > 5 && <span className="shi-opponent-hand-count">×{count}</span>}
+      {count === 0 && (
+        <span className="shi-opponent-hand-count">—</span>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Top-level dispatcher: chooses Setup / Playing / Finished.
+// ---------------------------------------------------------------------------
+
 function ShitheadGamePanel({ state, onAction, onShowError }: Props) {
   const { t } = useTranslation();
   const selfId = state.players[state.selfIndex]?.id ?? '';
   const isMyTurn = state.selfIndex === state.currentPlayerIdx;
-  // Quick-chain rule: after you played a card from hand and the refill
-  // drew another of the same rank, the engine lets you chain it in
-  // before the next player acts. While the chain is armed for self,
-  // we keep the hand interactive even though it's not technically our
-  // turn — the player races against the next player's first action.
   const chainArmed =
     state.quickChainEligible?.playerId === selfId &&
     state.quickChainEligible !== null;
   const handInteractive = isMyTurn || chainArmed;
   const isChooser = state.pendingJokerChooserId === selfId;
-  const pileTop = state.pile[state.pile.length - 1] ?? null;
 
   if (state.phase === 'setup') {
     return (
@@ -162,7 +313,6 @@ function ShitheadGamePanel({ state, onAction, onShowError }: Props) {
       handInteractive={handInteractive}
       chainArmed={chainArmed}
       isChooser={isChooser}
-      pileTop={pileTop}
       selfId={selfId}
       t={t}
       onAction={onAction}
@@ -181,7 +331,6 @@ function SetupView({
   onShowError,
 }: Pick<Props, 'state' | 'onAction' | 'onShowError'>) {
   const { t } = useTranslation();
-  // Track picks by cardKey so the selection survives the sorted reorder.
   const [pickedKeys, setPickedKeys] = useState<readonly string[]>([]);
   const selfPlayer = state.players[state.selfIndex];
   const myFaceUp = state.selfFaceUp;
@@ -201,9 +350,6 @@ function SetupView({
       onShowError(t('games.shithead.setup_pick_three'));
       return;
     }
-    // Engine wants indexes into the AUTHORITATIVE hand (the server's
-    // unsorted order). Map each picked cardKey back to its original
-    // index.
     const indexes: number[] = [];
     for (const key of pickedKeys) {
       const idx = state.selfHand.findIndex((c) => cardKey(c) === key);
@@ -217,40 +363,49 @@ function SetupView({
   };
 
   return (
-    <div className="shi-panel">
-      <h3 className="shi-heading">{t('games.shithead.setup_title')}</h3>
-      {alreadyConfirmed ? (
-        <p className="shi-status">{t('games.shithead.setup_waiting')}</p>
-      ) : (
-        <>
-          <p className="shi-status">{t('games.shithead.setup_instruction')}</p>
-          <div className="shi-hand">
-            {sortedHand.map((c) => {
-              const k = cardKey(c);
-              return (
-                <button
-                  key={k}
-                  type="button"
-                  className={`shi-card-btn ${pickedKeys.includes(k) ? 'picked' : ''}`}
-                  onClick={() => toggle(k)}
-                  aria-label={`${c.rank} ${c.suit}`}
-                >
-                  <CardSvg card={c} />
-                </button>
-              );
-            })}
-          </div>
-          <button
-            type="button"
-            className="primary"
-            disabled={pickedKeys.length !== 3}
-            onClick={confirm}
-          >
-            {t('games.shithead.setup_confirm', { picked: pickedKeys.length })}
-          </button>
-        </>
-      )}
-      <OthersList state={state} />
+    <div className="shi-table">
+      <OpponentsRow state={state} />
+
+      <div className="shi-setup-wrap">
+        <h3 className="shi-setup-title">{t('games.shithead.setup_title')}</h3>
+        {alreadyConfirmed ? (
+          <p className="shi-setup-instruction">
+            {t('games.shithead.setup_waiting')}
+          </p>
+        ) : (
+          <>
+            <p className="shi-setup-instruction">
+              {t('games.shithead.setup_instruction')}
+            </p>
+            <div className="shi-setup-hand">
+              {sortedHand.map((c) => {
+                const k = cardKey(c);
+                const picked = pickedKeys.includes(k);
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    className={`shi-hand-card ${picked ? 'picked' : ''}`}
+                    onClick={() => toggle(k)}
+                    aria-label={`${c.rank} ${c.suit}`}
+                    style={{ marginInlineStart: 0 }}
+                  >
+                    <CardSvg card={c} />
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              type="button"
+              className="shi-setup-confirm"
+              disabled={pickedKeys.length !== 3}
+              onClick={confirm}
+            >
+              {t('games.shithead.setup_confirm', { picked: pickedKeys.length })}
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -265,7 +420,6 @@ interface PlayingProps {
   handInteractive: boolean;
   chainArmed: boolean;
   isChooser: boolean;
-  pileTop: Card | null;
   selfId: string;
   t: ReturnType<typeof useTranslation>['t'];
   onAction: (action: ShitheadAction) => void;
@@ -278,20 +432,14 @@ function PlayingView({
   handInteractive,
   chainArmed,
   isChooser,
-  pileTop,
   selfId,
   t,
   onAction,
   onShowError,
 }: PlayingProps) {
-  // Selected cards (by stable cardKey) for the next play. The action
-  // shape requires same-rank cards, so toggling enforces single-rank
-  // groups. Selection is by key — independent of the sorted display
-  // order, so reorders don't fall apart.
   const [selectedHandKeys, setSelectedHandKeys] = useState<readonly string[]>([]);
   const [selectedFaceUpKeys, setSelectedFaceUpKeys] = useState<readonly string[]>([]);
   const sortedHand = useMemo(() => sortCards(state.selfHand), [state.selfHand]);
-  const sortedFaceUp = useMemo(() => sortCards(state.selfFaceUp), [state.selfFaceUp]);
 
   // What phase is THIS player in? Drives which set of cards is interactive.
   const playerPhase = useMemo(() => {
@@ -307,16 +455,9 @@ function PlayingView({
     state.selfFaceDownCount,
   ]);
 
-  // Burn-burst opportunity. Hand takes precedence; faceUp only counts
-  // once the player is in faceUp phase (no hand, no deck). When it's
-  // available the second "פרוץ ושרוף" button shows up and a toast pops
-  // to nudge the player to race the next play.
   const burnBurst = useMemo<
     { cards: Card[]; source: 'hand' | 'faceUp' } | null
   >(() => {
-    // Priority 1: the player's manual selection, when it would burn.
-    // Letting selection win means the player can burn 2s/3s on
-    // purpose, or pick a different rank than the auto path's choice.
     if (selectedHandKeys.length > 0) {
       const cards = selectedHandKeys
         .map((k) => state.selfHand.find((c) => cardKey(c) === k))
@@ -333,7 +474,6 @@ function PlayingView({
         return { cards, source: 'faceUp' };
       }
     }
-    // Priority 2: auto-detected burn (lowest non-2/non-3 rank).
     const fromHand = findBurnBurst(state.selfHand, state.pile);
     if (fromHand) return { cards: fromHand, source: 'hand' };
     if (state.selfHand.length === 0 && state.deckCount === 0) {
@@ -350,8 +490,7 @@ function PlayingView({
     selectedFaceUpKeys,
   ]);
 
-  // Fire a one-shot toast the moment a burn-burst becomes available so
-  // the player notices before the next action closes the window.
+  // Fire a one-shot toast the moment a burn-burst becomes available.
   const prevBurnAvailable = useRef(false);
   useEffect(() => {
     const nowAvailable = burnBurst !== null;
@@ -365,9 +504,6 @@ function PlayingView({
     prevBurnAvailable.current = nowAvailable;
   }, [burnBurst, onShowError, t]);
 
-  // Look up a Card by its cardKey from the actor's authoritative hand /
-  // faceUp. Returns null when the key has gone stale (the card was
-  // played in a prior action and the new state no longer contains it).
   const handByKey = (k: string) =>
     state.selfHand.find((c) => cardKey(c) === k) ?? null;
   const faceUpByKey = (k: string) =>
@@ -379,20 +515,17 @@ function PlayingView({
     if (!c) return;
     setSelectedHandKeys((cur) => {
       if (cur.includes(k)) return cur.filter((x) => x !== k);
-      // Enforce same-rank selection: drop any prior picks of a different
-      // rank before adding the new one.
       const compatible = cur.filter((x) => handByKey(x)?.rank === c.rank);
       return [...compatible, k];
     });
   };
 
-  const toggleFaceUp = (k: string) => {
+  const toggleFaceUpCard = (card: Card) => {
+    const k = cardKey(card);
     setSelectedHandKeys([]);
-    const c = faceUpByKey(k);
-    if (!c) return;
     setSelectedFaceUpKeys((cur) => {
       if (cur.includes(k)) return cur.filter((x) => x !== k);
-      const compatible = cur.filter((x) => faceUpByKey(x)?.rank === c.rank);
+      const compatible = cur.filter((x) => faceUpByKey(x)?.rank === card.rank);
       return [...compatible, k];
     });
   };
@@ -448,12 +581,6 @@ function PlayingView({
     onAction({ type: 'shi.takePile', playerId: selfId });
   };
 
-  // Burst gathers every 4 the player owns and slams them in one shot.
-  // Hand source takes precedence; the faceUp fallback covers the case
-  // where the player has already emptied their hand AND the draw deck
-  // has been exhausted (faceUp phase) — without this the button used
-  // to grey out at exactly the moment a 4 from face-up could still
-  // burn the pile.
   const burst = () => {
     const handFours = state.selfHand.filter((c) => c.rank === '4');
     if (handFours.length > 0) {
@@ -482,6 +609,7 @@ function PlayingView({
   };
 
   const revealFaceDown = (index: number) => {
+    if (!isMyTurn) return;
     onAction({
       type: 'shi.playFaceDown',
       playerId: selfId,
@@ -492,63 +620,70 @@ function PlayingView({
   // Joker chooser overlay
   if (isChooser) {
     return (
-      <JokerChooser
-        state={state}
-        selfId={selfId}
-        onChoose={(victimId) =>
-          onAction({
-            type: 'shi.joker.choose',
-            playerId: selfId,
-            victimId,
-          })
-        }
-      />
+      <div className="shi-table">
+        <OpponentsRow state={state} />
+        <JokerChooser
+          state={state}
+          selfId={selfId}
+          onChoose={(victimId) =>
+            onAction({
+              type: 'shi.joker.choose',
+              playerId: selfId,
+              victimId,
+            })
+          }
+        />
+      </div>
     );
   }
 
-  return (
-    <div className="shi-panel">
-      <OthersList state={state} highlight={state.currentPlayerIdx} />
+  const inFaceUpPhase = state.selfHand.length === 0 && state.deckCount === 0;
+  const burstEnabled = (() => {
+    const hasFour =
+      state.selfHand.some((c) => c.rank === '4') ||
+      (inFaceUpPhase && state.selfFaceUp.some((c) => c.rank === '4'));
+    const pileAllows =
+      state.pile.length === 0 || state.pile.every((c) => c.rank === '4');
+    return hasFour && pileAllows;
+  })();
 
-      <div className="shi-board">
-        <div className="shi-board-col">
-          <p className="shi-board-label">{t('games.shithead.deck')}</p>
-          <div className="shi-deck-count">{state.deckCount}</div>
+  return (
+    <div className="shi-table">
+      <OpponentsRow state={state} highlight={state.currentPlayerIdx} />
+
+      <div className="shi-center">
+        <div className="shi-center-col">
+          <p className="shi-center-label">{t('games.shithead.deck')}</p>
+          <DeckStack count={state.deckCount} />
         </div>
-        <div className="shi-board-col shi-pile">
-          <p className="shi-board-label">{t('games.shithead.pile')}</p>
-          {pileTop ? (
-            <div className="shi-pile-card-wrap">
-              <CardSvg card={pileTop} />
-              {topRunCount(state.pile) > 1 && (
-                <span className="shi-pile-run" aria-label="same-rank run">
-                  ×{topRunCount(state.pile)}
-                </span>
-              )}
-            </div>
-          ) : (
+        <div className="shi-center-col">
+          <p className="shi-center-label">{t('games.shithead.pile')}</p>
+          {state.pile.length === 0 ? (
             <div className="shi-pile-empty">{t('games.shithead.pile_empty')}</div>
+          ) : (
+            <PileStack pile={state.pile} />
           )}
-          <p className="shi-pile-count">
-            {t('games.shithead.pile_count', { count: state.pile.length })}
-          </p>
-          {pileTop && topRunCount(state.pile) >= 2 && topRunCount(state.pile) < 4 && (
-            <p className="shi-pile-burn-hint">
-              {t('games.shithead.pile_burn_hint', {
-                needed: 4 - topRunCount(state.pile),
-                rank: pileTop.rank,
-              })}
-            </p>
-          )}
+          {state.pile.length > 0 &&
+            topRunCount(state.pile) >= 2 &&
+            topRunCount(state.pile) < 4 && (
+              <p className="shi-pile-burn-hint">
+                {t('games.shithead.pile_burn_hint', {
+                  needed: 4 - topRunCount(state.pile),
+                  rank: state.pile[state.pile.length - 1]!.rank,
+                })}
+              </p>
+            )}
         </div>
-        <div className="shi-board-col">
-          <p className="shi-board-label">{t('games.shithead.burned')}</p>
-          <div className="shi-deck-count">{state.burnedCount}</div>
+        <div className="shi-center-col">
+          <p className="shi-center-label">{t('games.shithead.burned')}</p>
+          <BurnedStack count={state.burnedCount} />
         </div>
       </div>
 
       <div className="shi-self">
-        <p className="shi-turn-indicator">
+        <p
+          className={`shi-turn-indicator ${isMyTurn || chainArmed ? 'your-turn' : ''}`}
+        >
           {isMyTurn
             ? t('games.shithead.your_turn')
             : chainArmed
@@ -561,10 +696,6 @@ function PlayingView({
                 })}
         </p>
 
-        {/* Action row sits ABOVE the cards so the player can always
-            reach Burst/Burn without scrolling past a wide hand. The
-            timing of these actions is critical when a chain or burst
-            window is open. */}
         <div className="shi-actions">
           <button
             type="button"
@@ -589,20 +720,7 @@ function PlayingView({
             type="button"
             className="secondary"
             onClick={burst}
-            disabled={
-              (() => {
-                const inFaceUpPhase =
-                  state.selfHand.length === 0 && state.deckCount === 0;
-                const hasFour =
-                  state.selfHand.some((c) => c.rank === '4') ||
-                  (inFaceUpPhase &&
-                    state.selfFaceUp.some((c) => c.rank === '4'));
-                const pileAllows =
-                  state.pile.length === 0 ||
-                  state.pile.every((c) => c.rank === '4');
-                return !hasFour || !pileAllows;
-              })()
-            }
+            disabled={!burstEnabled}
             title={t('games.shithead.burst_with_4_hint')}
           >
             {t('games.shithead.burst_with_4')}
@@ -610,7 +728,7 @@ function PlayingView({
           {burnBurst && (
             <button
               type="button"
-              className="primary burn-burst"
+              className="burn-burst"
               onClick={() => {
                 onAction({
                   type: 'shi.burst',
@@ -630,6 +748,36 @@ function PlayingView({
           )}
         </div>
 
+        {/* Self tableau: face-down + face-up on the table. The face-down
+            stays visible even after its face-up neighbour is played so
+            the player can see how many blind reveals remain. */}
+        <div
+          className={`shi-self-tableau ${playerPhase === 'faceUp' && handInteractive ? 'faceup-active' : ''}`}
+        >
+          <PlayerTableau
+            faceUp={state.selfFaceUp}
+            faceDownCount={state.selfFaceDownCount}
+            facedownClass={() =>
+              playerPhase === 'faceDown' && isMyTurn ? 'revealable' : ''
+            }
+            onFaceUpClick={
+              playerPhase === 'faceUp' && handInteractive
+                ? toggleFaceUpCard
+                : undefined
+            }
+            onFaceDownClick={
+              playerPhase === 'faceDown' && isMyTurn
+                ? revealFaceDown
+                : undefined
+            }
+            selectedKeys={selectedFaceUpKeys}
+          />
+        </div>
+
+        {/* Own hand fanned at the bottom — only shown while the player
+            is actually in 'hand' phase (still has hand cards or the
+            deck is alive). After hand+deck are empty, the face-up
+            tableau above takes over the interactive role. */}
         {playerPhase === 'hand' && (
           <div className="shi-hand">
             {sortedHand.map((c) => {
@@ -638,7 +786,7 @@ function PlayingView({
                 <button
                   key={k}
                   type="button"
-                  className={`shi-card-btn ${selectedHandKeys.includes(k) ? 'picked' : ''}`}
+                  className={`shi-hand-card ${selectedHandKeys.includes(k) ? 'picked' : ''}`}
                   onClick={() => toggleHand(k)}
                   disabled={!handInteractive}
                   aria-label={`${c.rank} ${c.suit}`}
@@ -650,48 +798,47 @@ function PlayingView({
           </div>
         )}
 
-        {playerPhase === 'faceUp' && (
-          <div className="shi-hand">
-            {sortedFaceUp.map((c) => {
-              const k = cardKey(c);
-              return (
-                <button
-                  key={k}
-                  type="button"
-                  className={`shi-card-btn ${selectedFaceUpKeys.includes(k) ? 'picked' : ''}`}
-                  onClick={() => toggleFaceUp(k)}
-                  disabled={!handInteractive}
-                  aria-label={`${c.rank} ${c.suit}`}
-                >
-                  <CardSvg card={c} />
-                </button>
-              );
-            })}
-          </div>
-        )}
-
         {playerPhase === 'faceDown' && (
-          <div className="shi-facedown-row">
-            <p className="shi-status">{t('games.shithead.facedown_reveal_hint')}</p>
-            <div className="shi-hand">
-              {Array.from({ length: state.selfFaceDownCount }).map((_, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  className="shi-card-btn shi-card-back"
-                  onClick={() => isMyTurn && revealFaceDown(i)}
-                  disabled={!isMyTurn}
-                  aria-label={t('games.shithead.facedown_reveal')}
-                >
-                  ?
-                </button>
-              ))}
-            </div>
-          </div>
+          <p className="shi-setup-instruction">
+            {t('games.shithead.facedown_reveal_hint')}
+          </p>
         )}
-
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Opponents row: name + face-up/face-down tableau + small hand-count fan.
+// ---------------------------------------------------------------------------
+
+function OpponentsRow({
+  state,
+  highlight,
+}: {
+  state: ShitheadClientGameState;
+  highlight?: number;
+}) {
+  return (
+    <ul className="shi-opponents">
+      {state.players.map((p: ShitheadPublicPlayer, i) => {
+        if (i === state.selfIndex) return null;
+        return (
+          <li
+            key={p.id}
+            className={`shi-opponent ${i === highlight ? 'turn' : ''} ${p.isOut ? 'out' : ''}`}
+          >
+            <span className="shi-opponent-name">{p.nickname}</span>
+            <OpponentHand count={p.handCount} />
+            <PlayerTableau
+              faceUp={p.faceUp}
+              faceDownCount={p.faceDownCount}
+              faceUpVariant="small"
+            />
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -713,21 +860,18 @@ function JokerChooser({
     (p) => p.id !== selfId && !p.isOut,
   );
   return (
-    <div className="shi-panel">
-      <div className="shi-joker-overlay">
-        <h3 className="shi-heading">{t('games.shithead.joker_pick_victim')}</h3>
-        <div className="shi-joker-buttons">
-          {victims.map((v) => (
-            <button
-              key={v.id}
-              type="button"
-              className="primary"
-              onClick={() => onChoose(v.id)}
-            >
-              {v.nickname}
-            </button>
-          ))}
-        </div>
+    <div className="shi-joker-overlay">
+      <h3>{t('games.shithead.joker_pick_victim')}</h3>
+      <div className="shi-joker-buttons">
+        {victims.map((v) => (
+          <button
+            key={v.id}
+            type="button"
+            onClick={() => onChoose(v.id)}
+          >
+            {v.nickname}
+          </button>
+        ))}
       </div>
     </div>
   );
@@ -742,67 +886,25 @@ function FinishedView({ state }: { state: ShitheadClientGameState }) {
   const loser = state.players.find((p) => p.id === state.loser);
   const winner = state.players.find((p) => p.id === state.outOrder[0]);
   return (
-    <div className="shi-panel shi-finished">
-      <h2 className="shi-heading">
-        {state.endReason === 'player_disconnected'
-          ? t('games.shithead.ended_disconnect')
-          : t('games.shithead.ended_normal')}
-      </h2>
-      {winner && (
-        <p>
-          {t('games.shithead.winner_label', { nickname: winner.nickname })}
-        </p>
-      )}
-      {loser && (
-        <p>
-          {t('games.shithead.loser_label', { nickname: loser.nickname })}
-        </p>
-      )}
+    <div className="shi-table">
+      <div className="shi-finished">
+        <h2>
+          {state.endReason === 'player_disconnected'
+            ? t('games.shithead.ended_disconnect')
+            : t('games.shithead.ended_normal')}
+        </h2>
+        {winner && (
+          <p>
+            {t('games.shithead.winner_label', { nickname: winner.nickname })}
+          </p>
+        )}
+        {loser && (
+          <p>
+            {t('games.shithead.loser_label', { nickname: loser.nickname })}
+          </p>
+        )}
+      </div>
     </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Other-players panel (shared by Setup + Playing).
-// ---------------------------------------------------------------------------
-
-function OthersList({
-  state,
-  highlight,
-}: {
-  state: ShitheadClientGameState;
-  highlight?: number;
-}) {
-  const { t } = useTranslation();
-  return (
-    <ul className="shi-players">
-      {state.players.map((p: ShitheadPublicPlayer, i) => {
-        const isSelf = i === state.selfIndex;
-        return (
-          <li
-            key={p.id}
-            className={`shi-player ${i === highlight ? 'turn' : ''} ${p.isOut ? 'out' : ''}`}
-          >
-            <div className="shi-player-meta">
-              <strong>
-                {p.nickname}
-                {isSelf && ' (' + t('games.shithead.you') + ')'}
-              </strong>
-              <span>
-                {t('games.shithead.hand_count', { count: p.handCount })}
-                {' · '}
-                {t('games.shithead.facedown_count', { count: p.faceDownCount })}
-              </span>
-            </div>
-            <div className="shi-player-faceup">
-              {p.faceUp.map((c, k) => (
-                <CardSvg key={cardKey(c) + k} card={c} variant="small" />
-              ))}
-            </div>
-          </li>
-        );
-      })}
-    </ul>
   );
 }
 
