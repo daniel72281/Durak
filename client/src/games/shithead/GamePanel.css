@@ -162,11 +162,12 @@
   margin-inline-start: 4px;
 }
 
-/* Per-player table area. Each "slot" is TALLER than a single card so
-   the face-down (top) and face-up (offset ~40% down) can both stay
-   visible simultaneously. After the face-up is played only the
-   face-down remains — the slot geometry doesn't shift, keeping the
-   layout stable. */
+/* Per-player table area. Each slot holds a face-down card back with a
+   face-up card layered on top that FULLY COVERS it. That means:
+   - while the face-up is present, only the face-up card is visible
+   - once the face-up is played (removed from the DOM), the face-down
+     card back beneath is revealed in the same slot
+   No layout shift, no peeking edges. */
 .shi-tableau {
   display: flex;
   gap: 6px;
@@ -177,9 +178,8 @@
 .shi-slot {
   position: relative;
   width: clamp(48px, 9vw, 66px);
-  /* Card aspect 167/242 → height ≈ width * 1.45.
-     Slot height reserves an extra ~45% for the face-up overhang. */
-  height: clamp(100px, 19vw, 138px);
+  /* Card aspect 167/242 → height ≈ width * 1.45. */
+  aspect-ratio: 167 / 242;
   flex-shrink: 0;
 }
 
@@ -195,13 +195,11 @@
   z-index: 1;
 }
 
-/* Face-up sits ~40% down so the top ~40% of the face-down card is
-   always visible above it. When the face-up is played (removed from
-   the DOM) the face-down doesn't shift — it just becomes fully
-   exposed at the top of the slot. */
+/* Face-up fully covers the face-down beneath. When it's removed the
+   face-down becomes visible in-place. */
 .shi-slot-faceup {
   position: absolute;
-  top: 40%;
+  top: 0;
   left: 0;
   width: 100%;
   z-index: 2;
@@ -566,11 +564,12 @@
 
 .shi-self-tableau .shi-slot {
   width: clamp(70px, 14vw, 96px);
-  height: clamp(148px, 28vw, 202px);
+  aspect-ratio: 167 / 242;
+  height: auto;
 }
 
 .shi-self-tableau .shi-slot-faceup {
-  top: 40%;
+  top: 0;
   left: 0;
 }
 
