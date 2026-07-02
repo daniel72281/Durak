@@ -626,12 +626,14 @@
     0 4px 10px rgba(252, 211, 77, 0.5);
 }
 
-/* The hand fan: cards row, overlapping. Forced LTR so the rightmost
-   card is on top of the stack and each card to the left shows its
-   TOP-LEFT corner (where the rank + suit indices live) — the natural
-   reading order for a card fan regardless of page direction. The
-   overlap amount is set via --hand-overlap on the container from JS
-   (grows with card count so a big hand always fits on screen). */
+/* The hand fan: cards row. Forced LTR so the rightmost card is on top
+   of the stack and each card to the left shows its TOP-LEFT corner
+   (where the rank + suit indices live) — the natural reading order
+   for a card fan regardless of page direction. --card-margin comes
+   from JS (SelfHand): positive = comfortable gap between cards,
+   negative = overlap. Cards only overlap when they'd otherwise
+   overflow the viewport, so on wide screens the hand spreads out
+   properly instead of being crammed to the center. */
 .shi-hand {
   display: flex;
   justify-content: center;
@@ -640,7 +642,7 @@
   min-height: 120px;
   perspective: 800px;
   direction: ltr;
-  --hand-overlap: 22px;
+  --card-margin: 4px;
   max-width: 100%;
 }
 
@@ -648,7 +650,7 @@
   background: none;
   border: none;
   padding: 0;
-  margin-inline-start: calc(var(--hand-overlap) * -1);
+  margin-inline-start: var(--card-margin);
   cursor: pointer;
   transition: transform 0.18s ease;
   position: relative;

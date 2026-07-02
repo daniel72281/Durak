@@ -777,40 +777,18 @@ function PlayingView({
         {/* Own hand fanned at the bottom — only shown while the player
             is actually in 'hand' phase (still has hand cards or the
             deck is alive). After hand+deck are empty, the face-up
-            tableau above takes over the interactive role.
-
-            --hand-overlap grows with card count so wide hands still
-            fit on screen. Base overlap 22px; each card beyond 4 adds
-            8px more overlap, capped at 60px (leaves ≈4-8px of each
-            covered card visible for the rank/suit index). */}
-        {playerPhase === 'hand' && (() => {
-          const cardCount = sortedHand.length;
-          const overlap = cardCount <= 4
-            ? 22
-            : Math.min(60, 22 + (cardCount - 4) * 8);
-          return (
-            <div
-              className="shi-hand"
-              style={{ ['--hand-overlap']: `${overlap}px` } as CSSProperties}
-            >
-              {sortedHand.map((c) => {
-                const k = cardKey(c);
-                return (
-                  <button
-                    key={k}
-                    type="button"
-                    className={`shi-hand-card ${selectedHandKeys.includes(k) ? 'picked' : ''}`}
-                    onClick={() => toggleHand(k)}
-                    disabled={!handInteractive}
-                    aria-label={`${c.rank} ${c.suit}`}
-                  >
-                    <CardSvg card={c} />
-                  </button>
-                );
-              })}
-            </div>
-          );
-        })()}
+            tableau above takes over the interactive role. The
+            SelfHand subcomponent handles the viewport-aware spread
+            math so cards use the full available width instead of
+            being crammed into the center on wide screens. */}
+        {playerPhase === 'hand' && (
+          <SelfHand
+            sortedHand={sortedHand}
+            selectedHandKeys={selectedHandKeys}
+            handInteractive={handInteractive}
+            onToggle={toggleHand}
+          />
+        )}
 
         {playerPhase === 'faceDown' && (
           <p className="shi-setup-instruction">
@@ -818,6 +796,84 @@ function PlayingView({
           </p>
         )}
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Self hand — viewport-aware spacing so a modest hand doesn't stay
+// crammed into the middle of a wide screen. On mobile the cards start
+// overlapping only when they'd otherwise overflow the viewport; on
+// desktop the cards get a comfortable 4px gap and sit centered.
+// ---------------------------------------------------------------------------
+
+function useViewportWidth(): number {
+  const [w, setW] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth : 800,
+  );
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onResize = () => setW(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  return w;
+}
+
+function SelfHand({
+  sortedHand,
+  selectedHandKeys,
+  handInteractive,
+  onToggle,
+}: {
+  sortedHand: readonly Card[];
+  selectedHandKeys: readonly string[];
+  handInteractive: boolean;
+  onToggle: (key: string) => void;
+}) {
+  const viewportWidth = useViewportWidth();
+
+  // Match the CSS clamp(56px, 10vw, 88px) for hand-card width so the
+  // math stays in sync with what the browser actually renders.
+  const cardWidth = Math.max(56, Math.min(88, viewportWidth * 0.10));
+
+  // Leave a small left/right buffer for the .shi-table padding.
+  const availableWidth = Math.max(200, viewportWidth - 24);
+
+  const cardCount = sortedHand.length;
+  const gapWhenFits = 4; // px between cards when the hand fits comfortably
+  const naturalWithGap =
+    cardCount * cardWidth + Math.max(0, cardCount - 1) * gapWhenFits;
+
+  // Positive value = space between cards, negative value = overlap.
+  // Cards only overlap when the natural row would overflow.
+  const cardMargin =
+    cardCount <= 1
+      ? 0
+      : naturalWithGap > availableWidth
+        ? -((naturalWithGap - availableWidth) / (cardCount - 1))
+        : gapWhenFits;
+
+  return (
+    <div
+      className="shi-hand"
+      style={{ ['--card-margin']: `${cardMargin}px` } as CSSProperties}
+    >
+      {sortedHand.map((c) => {
+        const k = cardKey(c);
+        return (
+          <button
+            key={k}
+            type="button"
+            className={`shi-hand-card ${selectedHandKeys.includes(k) ? 'picked' : ''}`}
+            onClick={() => onToggle(k)}
+            disabled={!handInteractive}
+            aria-label={`${c.rank} ${c.suit}`}
+          >
+            <CardSvg card={c} />
+          </button>
+        );
+      })}
     </div>
   );
 }
