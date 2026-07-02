@@ -77,26 +77,54 @@
 
 /* ---- top: opponent area ---- */
 
+/* Grid-based layout so opponent boxes never collapse into a vertical
+   column on mobile. Per-count templates place opponents naturally:
+   - 1 opp (2p): single centered box
+   - 2 opps (3p): side by side
+   - 3 opps (4p): 1 on top row, 2 flanking on bottom row
+   - 4 opps (5p): 2 × 2 grid */
 .shi-opponents {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 18px;
+  display: grid;
+  gap: 10px 14px;
+  justify-items: center;
+  align-items: start;
   justify-content: center;
-  align-items: flex-start;
-  margin-block-end: 28px;
+  margin-block-end: 20px;
+  padding-inline: 4px;
+  list-style: none;
+  padding-inline-start: 0;
+}
+
+.shi-opponents[data-count="1"] { grid-template-columns: minmax(0, auto); }
+.shi-opponents[data-count="2"] {
+  grid-template-columns: repeat(2, minmax(0, auto));
+}
+.shi-opponents[data-count="3"] {
+  grid-template-columns: repeat(2, minmax(0, auto));
+  grid-template-areas:
+    "top top"
+    "left right";
+}
+.shi-opponents[data-count="3"] .shi-opponent:nth-child(1) { grid-area: top; }
+.shi-opponents[data-count="3"] .shi-opponent:nth-child(2) { grid-area: left; }
+.shi-opponents[data-count="3"] .shi-opponent:nth-child(3) { grid-area: right; }
+.shi-opponents[data-count="4"] {
+  grid-template-columns: repeat(2, minmax(0, auto));
 }
 
 .shi-opponent {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  border-radius: 14px;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 12px;
   background: rgba(0, 0, 0, 0.18);
   border: 1px solid rgba(255, 255, 255, 0.06);
   transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
   min-width: 0;
+  max-width: 100%;
+  list-style: none;
 }
 
 .shi-opponent.turn {
@@ -162,7 +190,10 @@
 
 .shi-slot {
   position: relative;
-  width: clamp(48px, 9vw, 66px);
+  /* Opponent tableau default: intentionally small so 2-3 opponents fit
+     side by side even on narrow phones. Self tableau overrides this
+     with a larger clamp below. */
+  width: clamp(36px, 7vw, 56px);
   /* Card aspect 167/242 → height ≈ width * 1.45. */
   aspect-ratio: 167 / 242;
   flex-shrink: 0;
@@ -552,7 +583,9 @@
 }
 
 .shi-self-tableau .shi-slot {
-  width: clamp(70px, 14vw, 96px);
+  /* Match hand-card width (clamp(64px, 11vw, 92px)) so the tableau
+     never appears LARGER than the hand row below it. */
+  width: clamp(58px, 10vw, 84px);
   aspect-ratio: 167 / 242;
   height: auto;
 }
@@ -593,8 +626,12 @@
     0 4px 10px rgba(252, 211, 77, 0.5);
 }
 
-/* The hand fan: cards row, gently overlapping. Each card pops up on
-   hover and bumps neighbors aside. */
+/* The hand fan: cards row, overlapping. Forced LTR so the rightmost
+   card is on top of the stack and each card to the left shows its
+   TOP-LEFT corner (where the rank + suit indices live) — the natural
+   reading order for a card fan regardless of page direction. The
+   overlap amount is set via --hand-overlap on the container from JS
+   (grows with card count so a big hand always fits on screen). */
 .shi-hand {
   display: flex;
   justify-content: center;
@@ -602,15 +639,18 @@
   padding-block: 6px;
   min-height: 120px;
   perspective: 800px;
+  direction: ltr;
+  --hand-overlap: 22px;
+  max-width: 100%;
 }
 
 .shi-hand-card {
   background: none;
   border: none;
   padding: 0;
-  margin-inline-start: -22px;
+  margin-inline-start: calc(var(--hand-overlap) * -1);
   cursor: pointer;
-  transition: transform 0.18s ease, margin 0.18s ease;
+  transition: transform 0.18s ease;
   position: relative;
   transform-origin: bottom center;
 }
@@ -629,20 +669,22 @@
   filter: brightness(0.85);
 }
 
+/* Picked cards stay AT REST — only a gold outline marks the selection.
+   Keeping them at rest means the hover lift is the ONLY thing that
+   raises a card, so at most one card is elevated at a time. */
 .shi-hand-card.picked {
-  transform: translateY(-22px);
-  z-index: 11;
+  z-index: 3;
 }
 
 .shi-hand-card.picked .card-svg {
   box-shadow:
     inset 0 0 0 1px rgba(0, 0, 0, 0.7),
     0 0 0 3px #fcd34d,
-    0 8px 18px rgba(252, 211, 77, 0.6);
+    0 4px 12px rgba(252, 211, 77, 0.55);
 }
 
 .shi-hand .card-svg {
-  width: clamp(64px, 11vw, 92px);
+  width: clamp(56px, 10vw, 88px);
   display: block;
 }
 
@@ -751,16 +793,25 @@
 
 @media (max-width: 480px) {
   .shi-table {
-    padding: 60px 8px 16px;
+    padding: 56px 6px 14px;
   }
   .shi-opponents {
-    gap: 10px;
+    gap: 6px 8px;
+  }
+  .shi-opponent {
+    padding: 6px 6px;
+    gap: 4px;
+  }
+  .shi-opponent-name {
+    font-size: 0.78rem;
   }
   .shi-center {
-    gap: 14px;
-    padding: 16px 0;
+    gap: 10px;
+    padding: 14px 0;
   }
-  .shi-hand-card {
-    margin-inline-start: -32px;
+  .shi-actions button {
+    min-width: 90px;
+    padding: 8px 10px;
+    font-size: 0.85rem;
   }
 }

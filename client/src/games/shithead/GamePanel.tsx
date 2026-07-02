@@ -12,7 +12,7 @@
 // opponent tableau — face-down + face-up stacks on the table, hand
 // fanned below as the interactive row.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Card } from '@shared/types';
 import type {
@@ -777,26 +777,40 @@ function PlayingView({
         {/* Own hand fanned at the bottom — only shown while the player
             is actually in 'hand' phase (still has hand cards or the
             deck is alive). After hand+deck are empty, the face-up
-            tableau above takes over the interactive role. */}
-        {playerPhase === 'hand' && (
-          <div className="shi-hand">
-            {sortedHand.map((c) => {
-              const k = cardKey(c);
-              return (
-                <button
-                  key={k}
-                  type="button"
-                  className={`shi-hand-card ${selectedHandKeys.includes(k) ? 'picked' : ''}`}
-                  onClick={() => toggleHand(k)}
-                  disabled={!handInteractive}
-                  aria-label={`${c.rank} ${c.suit}`}
-                >
-                  <CardSvg card={c} />
-                </button>
-              );
-            })}
-          </div>
-        )}
+            tableau above takes over the interactive role.
+
+            --hand-overlap grows with card count so wide hands still
+            fit on screen. Base overlap 22px; each card beyond 4 adds
+            8px more overlap, capped at 60px (leaves ≈4-8px of each
+            covered card visible for the rank/suit index). */}
+        {playerPhase === 'hand' && (() => {
+          const cardCount = sortedHand.length;
+          const overlap = cardCount <= 4
+            ? 22
+            : Math.min(60, 22 + (cardCount - 4) * 8);
+          return (
+            <div
+              className="shi-hand"
+              style={{ ['--hand-overlap']: `${overlap}px` } as CSSProperties}
+            >
+              {sortedHand.map((c) => {
+                const k = cardKey(c);
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    className={`shi-hand-card ${selectedHandKeys.includes(k) ? 'picked' : ''}`}
+                    onClick={() => toggleHand(k)}
+                    disabled={!handInteractive}
+                    aria-label={`${c.rank} ${c.suit}`}
+                  >
+                    <CardSvg card={c} />
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })()}
 
         {playerPhase === 'faceDown' && (
           <p className="shi-setup-instruction">
@@ -819,8 +833,9 @@ function OpponentsRow({
   state: ShitheadClientGameState;
   highlight?: number;
 }) {
+  const opponentCount = state.players.length - 1;
   return (
-    <ul className="shi-opponents">
+    <ul className="shi-opponents" data-count={opponentCount}>
       {state.players.map((p: ShitheadPublicPlayer, i) => {
         if (i === state.selfIndex) return null;
         return (
