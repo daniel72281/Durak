@@ -409,10 +409,14 @@ io.on('connection', (socket) => {
     // a restart penalty (Shithead deals the loser's face-up randomly).
     const previousLoserId =
       (room.game as { loser?: string | null } | null)?.loser ?? null;
+    // Previous game's finishing order — Shithead uses this to reseat
+    // players so the next round's turn sequence is
+    // [winner, 2nd out, ..., shithead].
+    const previousOutOrder = engine.outOrder(room.game);
     try {
       const initial = engine.createGame(
         room.players.map((p) => ({ id: p.id, nickname: p.nickname })),
-        { previousLoserId },
+        { previousLoserId, previousOutOrder },
       );
       const shuffled = engine.buildShuffledDeck();
       // startGame in Durak supports an options arg with startPlayerId.

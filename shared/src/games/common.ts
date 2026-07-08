@@ -32,10 +32,16 @@ export type EngineResult<S> = EngineSuccess<S> | EngineError;
 // game:restart so engines can apply game-specific carryover rules:
 //   - Shithead reads `previousLoserId` to mark the new shithead with
 //     `forcedFaceUp` so the engine deals their face-up cards randomly.
-//   - Durak ignores it (its restart-starter logic lives on startGame's
-//     own options arg).
+//     It also reads `previousOutOrder` to reorder the seating so the
+//     turn sequence follows [winner, 2nd out, 3rd out, ..., shithead].
+//   - Durak ignores both fields (its restart-starter logic lives on
+//     startGame's own options arg).
 export interface CreateGameContext {
   previousLoserId?: string | null;
+  // Player-id sequence of the previous game's finishing order (first
+  // to empty their hand at index 0). Empty/omitted → this is the first
+  // game in the room, so no seating carryover.
+  previousOutOrder?: readonly string[];
 }
 
 // The contract each game implements. The server holds an opaque `unknown`

@@ -12,7 +12,7 @@
 
 import type { EngineResult } from '../common';
 import type { Card } from '../../types';
-import { drawFromTop } from '../../deck';
+import { drawFromTop, shuffle } from '../../deck';
 import { canPlay, nextActivePlayerIndex, pileHasFourInARow } from './rules';
 import type {
   ShitheadAction,
@@ -33,9 +33,30 @@ const POST_SETUP_HAND_TARGET = 3;
 
 export function createGame(
   playerSpecs: readonly { id: string; nickname: string }[],
-  options: { shitheadId?: string | null } = {},
+  options: {
+    shitheadId?: string | null;
+    // Previous game's finishing order. If provided, seating is
+    // reordered to [winner, 2nd out, ..., shithead] and currentPlayerIdx=0
+    // puts the winner first — takes precedence over randomizeSeats.
+    previousOutOrder?: readonly string[] | null;
+    // Only checked when previousOutOrder is empty. True → shuffle seats
+    // (server passes this on the FIRST game so the starter is random).
+    // Defaulting to false keeps the tests deterministic without every
+    // call site having to pass an rng.
+    randomizeSeats?: boolean;
+    // Deterministic hook for tests + the random-seat path in production.
+    // Production leaves it undefined (falls through to Math.random).
+    rng?: () => number;
+  } = {},
 ): ShitheadGameState {
-  const players: ShitheadPlayer[] = playerSpecs.map((p) => ({
+  const orderedSpecs = orderPlayerSpecs(
+    playerSpecs,
+    options.previousOutOrder ?? null,
+    options.shitheadId ?? null,
+    options.randomizeSeats ?? false,
+    options.rng,
+  );
+  const players: ShitheadPlayer[] = orderedSpecs.map((p) => ({
     id: p.id,
     nickname: p.nickname,
     hand: [],
@@ -54,6 +75,8 @@ export function createGame(
     deck: [],
     pile: [],
     burnedPile: [],
+    // Index 0 is the previous winner (or a random pick on the first
+    // game), so the current player starts as the round's first actor.
     currentPlayerIdx: 0,
     pendingJokerChooserId: null,
     quickChainEligible: null,
@@ -61,6 +84,49 @@ export function createGame(
     loser: null,
     endReason: null,
   };
+}
+
+// Seat players so the turn sequence follows the previous game's
+// finishing order:
+//   - previousOutOrder = [winner, 2nd, 3rd, ...] → seat them in that
+//     sequence at the head of the array, then append the shithead
+//     (loserId) at the end.
+//   - No previousOutOrder but randomizeSeats=true → shuffle (server
+//     uses this on the very first game so the starter is random).
+//   - Otherwise keep the incoming specs order (tests + any caller that
+//     needs deterministic seating).
+// Any player present in `specs` but not referenced by outOrder/loser
+// is appended at the end (defensive — shouldn't happen in practice).
+function orderPlayerSpecs(
+  specs: readonly { id: string; nickname: string }[],
+  previousOutOrder: readonly string[] | null,
+  loserId: string | null,
+  randomizeSeats: boolean,
+  rng?: () => number,
+): readonly { id: string; nickname: string }[] {
+  if (!previousOutOrder || previousOutOrder.length === 0) {
+    return randomizeSeats ? shuffle(specs.slice(), rng) : specs.slice();
+  }
+  const remaining = new Map(specs.map((s) => [s.id, s]));
+  const ordered: { id: string; nickname: string }[] = [];
+  for (const id of previousOutOrder) {
+    const s = remaining.get(id);
+    if (s) {
+      ordered.push(s);
+      remaining.delete(id);
+    }
+  }
+  if (loserId !== null) {
+    const loser = remaining.get(loserId);
+    if (loser) {
+      ordered.push(loser);
+      remaining.delete(loserId);
+    }
+  }
+  for (const s of remaining.values()) {
+    ordered.push(s);
+  }
+  return ordered;
 }
 
 // Deal 3 face-down + 6 hand cards to each player from `shuffledDeck`.

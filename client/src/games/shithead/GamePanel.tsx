@@ -292,6 +292,21 @@ function ShitheadGamePanel({ state, onAction, onShowError }: Props) {
   const handInteractive = isMyTurn || chainArmed;
   const isChooser = state.pendingJokerChooserId === selfId;
 
+  // Round-end reveal: when the phase flips to 'finished', keep rendering
+  // the PlayingView for 3 seconds so everyone can see the last card the
+  // winner just laid on the pile. Only after that do we swap in the
+  // slim FinishedView placeholder (the parent RoomPage's GameOverDialog
+  // uses the same 3s delay so both transitions land together).
+  const [finishedRevealDone, setFinishedRevealDone] = useState(false);
+  useEffect(() => {
+    if (state.phase !== 'finished') {
+      setFinishedRevealDone(false);
+      return;
+    }
+    const t = setTimeout(() => setFinishedRevealDone(true), 3000);
+    return () => clearTimeout(t);
+  }, [state.phase]);
+
   if (state.phase === 'setup') {
     return (
       <SetupView
@@ -302,17 +317,21 @@ function ShitheadGamePanel({ state, onAction, onShowError }: Props) {
     );
   }
 
-  if (state.phase === 'finished') {
+  if (state.phase === 'finished' && finishedRevealDone) {
     return <FinishedView state={state} />;
   }
 
+  // phase === 'playing' OR the 3s reveal window is still open.
+  // Freeze interactivity as soon as the phase flips so nobody can
+  // click Play/Take/Burst on a round that's technically already over.
+  const roundActive = state.phase === 'playing';
   return (
     <PlayingView
       state={state}
-      isMyTurn={isMyTurn}
-      handInteractive={handInteractive}
-      chainArmed={chainArmed}
-      isChooser={isChooser}
+      isMyTurn={roundActive && isMyTurn}
+      handInteractive={roundActive && handInteractive}
+      chainArmed={roundActive && chainArmed}
+      isChooser={roundActive && isChooser}
       selfId={selfId}
       t={t}
       onAction={onAction}

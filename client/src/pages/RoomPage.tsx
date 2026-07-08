@@ -177,13 +177,14 @@ function RoomPage() {
   }, [durakGameState, t]);
 
   // Phase-transition delay: when either game flips to 'finished', hold
-  // the GameOverDialog for ~2.5s so the players can see the final card
+  // the GameOverDialog for 3s so the players can see the final card
   // on the pile and understand WHY the round ended before the modal
-  // covers the table.
+  // covers the table. The Shithead panel uses the same 3s window
+  // internally to keep the PlayingView (with the fresh pile) up.
   const phase = durakGameState?.phase ?? shitheadGameState?.phase ?? null;
   useEffect(() => {
     if (phase === 'finished') {
-      const timer = setTimeout(() => setShowGameOver(true), 2500);
+      const timer = setTimeout(() => setShowGameOver(true), 3000);
       return () => clearTimeout(timer);
     }
     setShowGameOver(false);

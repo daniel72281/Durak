@@ -20,8 +20,14 @@ export const shitheadEngine: GameEngine<
   ShitheadClientGameState
 > = {
   createGame(players, context) {
+    const previousOutOrder = context?.previousOutOrder ?? null;
     return createGame(players, {
       shitheadId: context?.previousLoserId ?? null,
+      previousOutOrder,
+      // First game in the room (no previous ranking) → randomize seats
+      // so the starter is a random player. Restart uses previousOutOrder
+      // instead and doesn't need shuffling.
+      randomizeSeats: !previousOutOrder || previousOutOrder.length === 0,
     });
   },
   buildShuffledDeck(rng) {
