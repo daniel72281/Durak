@@ -80,6 +80,7 @@ export function createGame(
     currentPlayerIdx: 0,
     pendingJokerChooserId: null,
     quickChainEligible: null,
+    eightChain: null,
     outOrder: [],
     loser: null,
     endReason: null,
@@ -440,7 +441,8 @@ function handlePlay(
 //                      (covers 4-of-a-kind in one play and accumulated runs)
 //   - Joker            actor must follow up with shi.joker.choose; turn does
 //                      not advance and the Joker stays on the pile
-//   - 8 skip           advance by (playedCount + 1) active seats
+//   - 8 skip           from the actor's running 8 streak: parity at 2-3
+//                      players, one skipped seat per 8 at 4+ — see below
 //   - default          normal next-active
 function applyPostPlay(args: {
   state: ShitheadGameState;
@@ -480,32 +482,57 @@ function applyPostPlay(args: {
       pendingJokerChooserId: args.playerId,
       // Joker has its own pending-choose flow; chain doesn't apply here.
       quickChainEligible: null,
+      eightChain: null,
     };
   }
 
   const samePlayerReplays = isTen || isFourBurn;
+
+  // Running total of 8s this actor has laid down without anyone else
+  // acting in between — their own play plus any quick-chained follow-ups.
+  // Whichever rule applies below reads this ACCUMULATED total, so playing
+  // 2-then-1 resolves exactly like playing all three at once. A burn
+  // (10 / four-in-a-row) overrides the skip entirely, so the streak only
+  // builds on non-burning 8 plays.
+  const isEight = args.rank === '8';
+  const prevChain = args.state.eightChain;
+  const eightStreak =
+    isEight && !samePlayerReplays
+      ? (prevChain?.playerId === args.playerId ? prevChain.count : 0) +
+        args.playedCount
+      : 0;
+
   // When the actor keeps the turn (10 burn / 4-burn), they continue as
   // current player. For normal advance, walk active seats forward from
   // the actor's position — this lets quick-chain plays (where the actor
   // is NOT state.currentPlayerIdx) advance naturally.
   let nextIdx = args.playerIdx;
   if (!samePlayerReplays) {
-    const activeCount = args.newPlayers.filter((p) => !p.isOut).length;
-    if (args.rank === '8' && activeCount <= 2) {
-      // 2-player rule: 8s keep the turn with the actor. You can't skip
-      // yourself, and there's only one other seat — every skip bounces
-      // the round back, so any number of 8s leaves you on turn.
-      nextIdx = args.playerIdx;
-    } else {
-      const steps = args.rank === '8' ? args.playedCount + 1 : 1;
-      let cur = args.playerIdx;
-      for (let s = 0; s < steps; s++) {
-        const next = nextActivePlayerIndex(args.newPlayers, cur);
-        if (next === -1) break;
-        cur = next;
+    let steps = 1;
+    if (isEight) {
+      const activeCount = args.newPlayers.filter((p) => !p.isOut).length;
+      if (activeCount <= 3) {
+        // Small tables resolve 8s by PARITY. The seats wrap so quickly
+        // that a literal "one skipped seat per 8" overshoots: with 3
+        // players a third 8 would land on the next player instead of
+        // behaving like a lone 8, and with 2 players an even count would
+        // hand the turn to the opponent. Two 8s cancel out and bring the
+        // turn back; an odd count skips exactly one seat.
+        steps = eightStreak % 2 === 0 ? 0 : 2;
+      } else {
+        // 4+ players skip literally, one seat per 8. The deck holds only
+        // four 8s, so the count can never wrap a full cycle — a fourth 8
+        // burns as four-of-a-kind before any skip applies.
+        steps = eightStreak + 1;
       }
-      nextIdx = cur;
     }
+    let cur = args.playerIdx;
+    for (let s = 0; s < steps; s++) {
+      const next = nextActivePlayerIndex(args.newPlayers, cur);
+      if (next === -1) break;
+      cur = next;
+    }
+    nextIdx = cur;
   }
 
   // Re-arm the chain only when the turn ACTUALLY left the actor (any
@@ -526,6 +553,9 @@ function applyPostPlay(args: {
     players: args.newPlayers,
     currentPlayerIdx: nextIdx,
     quickChainEligible: newQuickChain,
+    eightChain: isEight && !samePlayerReplays
+      ? { playerId: args.playerId, count: eightStreak }
+      : null,
   };
 }
 
@@ -611,6 +641,7 @@ function handlePlayFaceDown(
     players: newPlayers,
     currentPlayerIdx: nextIdx === -1 ? state.currentPlayerIdx : nextIdx,
     quickChainEligible: null,
+    eightChain: null,
   });
 }
 
@@ -705,6 +736,46 @@ function handleBurst(
     ) {
       chainEligibleAfter = true;
     }
+  } else if (action.source === 'handAndFaceUp') {
+    // Combined burn: a player holding e.g. two 5s in hand and two 5s
+    // face-up spends all four in ONE move instead of playing the hand pair
+    // now and waiting a whole round for the face-up pair. Three conditions
+    // gate it, and all three matter:
+    //   1. the draw deck is empty (face-up cards are otherwise untouchable)
+    //   2. the move actually burns
+    //   3. it consumes the ENTIRE hand
+    // Without (3) a player holding 6,6,7 plus two face-up 6s could burn the
+    // 6s while still sitting on the 7 — reaching into their face-up cards
+    // with a live hand, which the normal turn rules forbid. They have to
+    // play the 7 first.
+    if (state.deck.length > 0) {
+      return fail('cannot combine hand and faceUp while deck is not empty');
+    }
+    if (!wouldBurn) {
+      return fail('combined hand+faceUp burst must complete a four-in-a-row');
+    }
+    // Every rank+suit is unique in the 54-card deck, so each named card
+    // lives in exactly one of the two piles — the hand lookup first is
+    // just ordering, not a preference.
+    for (const c of cards) {
+      const hi = newHand.findIndex(
+        (h) => h.rank === c.rank && h.suit === c.suit,
+      );
+      if (hi !== -1) {
+        newHand.splice(hi, 1);
+        continue;
+      }
+      const fi = newFaceUp.findIndex(
+        (h) => h.rank === c.rank && h.suit === c.suit,
+      );
+      if (fi === -1) return fail('card not in hand or faceUp');
+      newFaceUp.splice(fi, 1);
+    }
+    if (newHand.length > 0) {
+      return fail('combined burn must use every card left in your hand');
+    }
+    // No refill (the deck is empty by the gate above) and a burn keeps the
+    // turn with the burster anyway, so the quick chain never applies here.
   } else {
     if (player.hand.length > 0) {
       return fail('cannot burst from faceUp while hand is not empty');
@@ -767,6 +838,7 @@ function handleBurst(
     players: newPlayers,
     currentPlayerIdx: nextIdx,
     quickChainEligible: newQuickChain,
+    eightChain: null,
   });
 }
 
@@ -815,6 +887,7 @@ function handleJokerChoose(
     currentPlayerIdx: nextIdx === -1 ? state.currentPlayerIdx : nextIdx,
     pendingJokerChooserId: null,
     quickChainEligible: null,
+    eightChain: null,
   });
 }
 
@@ -855,6 +928,7 @@ function handleTakePile(
     players: newPlayers,
     currentPlayerIdx: nextIdx === -1 ? state.currentPlayerIdx : nextIdx,
     quickChainEligible: null,
+    eightChain: null,
   });
 }
 
@@ -958,6 +1032,7 @@ export function applyAutoTakeIfNeeded(
     players: newPlayers,
     currentPlayerIdx: nextIdx === -1 ? state.currentPlayerIdx : nextIdx,
     quickChainEligible: null,
+    eightChain: null,
   };
 }
 

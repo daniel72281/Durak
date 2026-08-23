@@ -52,16 +52,30 @@ function sortCards(cards: readonly Card[]): Card[] {
   });
 }
 
+// '2' (reset) and '3' (mirror) are worth keeping for their effects, so
+// they lose every tie-break against an ordinary rank — but they are still
+// offered when nothing else can burn. That matters most out of turn: when
+// someone else's cards complete a four-of-a-kind with the 2s or 3s in your
+// hand, the chance disappears the moment the next player acts, and a
+// missed burn costs more than a spent 2.
+const MAGIC_BURN_RANKS: ReadonlySet<Card['rank']> = new Set(['2', '3']);
+
+// Is `candidate` a better rank to auto-burn than `current`? Non-magic
+// always wins; within the same class, the lowest rank wins so the player
+// spends their least valuable cards.
+function betterBurnRank(candidate: Card['rank'], current: Card['rank']): boolean {
+  const candidateMagic = MAGIC_BURN_RANKS.has(candidate);
+  const currentMagic = MAGIC_BURN_RANKS.has(current);
+  if (candidateMagic !== currentMagic) return !candidateMagic;
+  return RANK_ORDER[candidate] < RANK_ORDER[current];
+}
+
 // Build the auto burn-burst option from a source of cards: find any
 // rank where (cards of that rank you own) + (matching-rank run at the
-// top of the pile) >= 4. Ranks '2' and '3' are skipped on purpose —
-// they're "magic" cards (reset + mirror) that players almost always
-// want to keep for their effects, and auto-burning them was a common
-// regret. Among the remaining ranks, prefers the lowest so the player
-// spends the least valuable cards. Returns null when no rank can
-// complete a four-in-a-row without using 2s or 3s — in that case the
-// player can still burn via the manual-selection override
-// (selectionWouldBurn).
+// top of the pile) >= 4, preferring whichever rank betterBurnRank ranks
+// highest. Returns null when no rank can complete a four-in-a-row — the
+// player can still burn any combination via the manual-selection
+// override (selectionWouldBurn).
 function findBurnBurst(
   source: readonly Card[],
   pile: readonly Card[],
@@ -83,10 +97,9 @@ function findBurnBurst(
   }
   let best: { rank: Card['rank']; cards: Card[] } | null = null;
   for (const [rank, group] of groups) {
-    if (rank === '2' || rank === '3') continue;
     const run = topRank === rank ? topRun : 0;
     if (group.length + run < 4) continue;
-    if (best === null || RANK_ORDER[rank] < RANK_ORDER[best.rank]) {
+    if (best === null || betterBurnRank(rank, best.rank)) {
       best = { rank, cards: group };
     }
   }
@@ -475,7 +488,7 @@ function PlayingView({
   ]);
 
   const burnBurst = useMemo<
-    { cards: Card[]; source: 'hand' | 'faceUp' } | null
+    { cards: Card[]; source: 'hand' | 'faceUp' | 'handAndFaceUp' } | null
   >(() => {
     if (selectedHandKeys.length > 0) {
       const cards = selectedHandKeys
@@ -495,6 +508,24 @@ function PlayingView({
     }
     const fromHand = findBurnBurst(state.selfHand, state.pile);
     if (fromHand) return { cards: fromHand, source: 'hand' };
+    // Combined hand + face-up burn. Legal only once the draw deck is dry
+    // AND the burn takes the player's whole hand with it, so it can never
+    // be used to reach into face-up cards while other hand cards remain
+    // (holding 6,6,7 against two face-up 6s means playing the 7 first).
+    // Requiring the entire hand to be one rank, then confirming the chosen
+    // burn IS that rank, enforces exactly that — the engine re-checks it.
+    if (state.deckCount === 0 && state.selfHand.length > 0) {
+      const handRank = state.selfHand[0]!.rank;
+      if (state.selfHand.every((c) => c.rank === handRank)) {
+        const combined = findBurnBurst(
+          [...state.selfHand, ...state.selfFaceUp],
+          state.pile,
+        );
+        if (combined && combined[0]!.rank === handRank) {
+          return { cards: combined, source: 'handAndFaceUp' };
+        }
+      }
+    }
     if (state.selfHand.length === 0 && state.deckCount === 0) {
       const fromFaceUp = findBurnBurst(state.selfFaceUp, state.pile);
       if (fromFaceUp) return { cards: fromFaceUp, source: 'faceUp' };

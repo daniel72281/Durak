@@ -81,6 +81,17 @@ export interface ShitheadGameState {
     rank: Card['rank'];
   } | null;
 
+  // Running total of 8s one player has laid down in an unbroken streak —
+  // their own play plus any quick-chained follow-ups that land before the
+  // next player acts. The skip is resolved from the PARITY of this total
+  // (two 8s cancel and hand the turn back; an odd one behaves like a lone
+  // 8), so 2-then-1 and 1-1-1 resolve identically. Cleared by any other
+  // action, by a different player acting, or by a non-8 play.
+  eightChain: {
+    playerId: string;
+    count: number;
+  } | null;
+
   loser: string | null;
 
   // Mirrors Durak's endReason so disconnect aborts route through the
@@ -119,10 +130,15 @@ export type ShitheadAction =
   // by laying down 1+ 4s from hand or faceUp. Multi-card bursts are
   // allowed so a player with all four 4s slams them down at once — the
   // engine then triggers the four-in-a-row burn and keeps their turn.
+  //
+  // 'handAndFaceUp' spends cards from BOTH piles in one move. It is only
+  // legal once the draw deck is empty and only when the move actually
+  // completes a burn — otherwise a player could dip into their face-up
+  // cards while still holding a hand, which the normal rules forbid.
   | {
       type: 'shi.burst';
       playerId: string;
-      source: 'hand' | 'faceUp';
+      source: 'hand' | 'faceUp' | 'handAndFaceUp';
       cards: readonly Card[];
     }
   // After playing a Joker, the player picks which other player swallows

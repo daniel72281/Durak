@@ -287,6 +287,8 @@ function makePlayingState(args: {
     burnedPile: [],
     currentPlayerIdx: args.currentPlayerIdx ?? 0,
     pendingJokerChooserId: null,
+    quickChainEligible: null,
+    eightChain: null,
     outOrder: [],
     loser: null,
     endReason: null,
@@ -626,6 +628,418 @@ describe('Shithead: shi.play — magic cards', () => {
       }),
     );
     expect(r.currentPlayerIdx).toBe(0);
+  });
+
+  it('3× 8 in one play behaves like a single 8 (skips B, lands on C)', () => {
+    // Parity rule: the first two 8s cancel out, so the third acts alone.
+    const state = makePlayingState({
+      hands: [
+        [card('8', 'spades'), card('8', 'diamonds'), card('8', 'hearts')],
+        [],
+        [],
+      ],
+      pile: [card('5', 'hearts')],
+    });
+    const r = unwrap(
+      applyAction(state, {
+        type: 'shi.play',
+        playerId: 'a',
+        source: 'hand',
+        cards: [
+          card('8', 'spades'),
+          card('8', 'diamonds'),
+          card('8', 'hearts'),
+        ],
+      }),
+    );
+    expect(r.currentPlayerIdx).toBe(2);
+  });
+
+  it('2× 8 then a chained 3rd 8 lands on C', () => {
+    // A plays two 8s (turn returns to A), draws a third and plays it —
+    // total streak 3, odd, so it resolves like a lone 8.
+    const state = makePlayingState({
+      hands: [[card('8', 'spades'), card('8', 'diamonds')], [], []],
+      pile: [card('5', 'hearts')],
+      deck: [card('8', 'hearts')],
+    });
+    const afterPair = unwrap(
+      applyAction(state, {
+        type: 'shi.play',
+        playerId: 'a',
+        source: 'hand',
+        cards: [card('8', 'spades'), card('8', 'diamonds')],
+      }),
+    );
+    expect(afterPair.currentPlayerIdx).toBe(0);
+    expect(afterPair.eightChain).toEqual({ playerId: 'a', count: 2 });
+
+    const afterThird = unwrap(
+      applyAction(afterPair, {
+        type: 'shi.play',
+        playerId: 'a',
+        source: 'hand',
+        cards: [card('8', 'hearts')],
+      }),
+    );
+    expect(afterThird.currentPlayerIdx).toBe(2);
+  });
+
+  it('three 8s played one at a time land on C, same as 2-then-1', () => {
+    const state = makePlayingState({
+      hands: [[card('8', 'spades')], [], []],
+      pile: [card('5', 'hearts')],
+      deck: [card('8', 'hearts'), card('8', 'diamonds')],
+    });
+    // First 8: skips B, turn to C, quick chain armed for A.
+    const first = unwrap(
+      applyAction(state, {
+        type: 'shi.play',
+        playerId: 'a',
+        source: 'hand',
+        cards: [card('8', 'spades')],
+      }),
+    );
+    expect(first.currentPlayerIdx).toBe(2);
+    expect(first.quickChainEligible).toEqual({ playerId: 'a', rank: '8' });
+
+    // Second 8 chained in out of turn: streak 2, turn comes back to A.
+    const second = unwrap(
+      applyAction(first, {
+        type: 'shi.play',
+        playerId: 'a',
+        source: 'hand',
+        cards: [card('8', 'diamonds')],
+      }),
+    );
+    expect(second.currentPlayerIdx).toBe(0);
+
+    // Third 8: streak 3, odd → skips B again and lands on C.
+    const third = unwrap(
+      applyAction(second, {
+        type: 'shi.play',
+        playerId: 'a',
+        source: 'hand',
+        cards: [card('8', 'hearts')],
+      }),
+    );
+    expect(third.currentPlayerIdx).toBe(2);
+  });
+
+  it('4 players skip by literal count, not parity', () => {
+    const play = (count: number): number => {
+      const eights = [
+        card('8', 'spades'),
+        card('8', 'diamonds'),
+        card('8', 'hearts'),
+      ].slice(0, count);
+      const state = makePlayingState({
+        hands: [eights, [], [], []],
+        pile: [card('5', 'hearts')],
+      });
+      return unwrap(
+        applyAction(state, {
+          type: 'shi.play',
+          playerId: 'a',
+          source: 'hand',
+          cards: eights,
+        }),
+      ).currentPlayerIdx;
+    };
+    expect(play(1)).toBe(2); // skip B → C
+    expect(play(2)).toBe(3); // skip B, C → D
+    expect(play(3)).toBe(0); // skip B, C, D → all the way back to A
+  });
+
+  it('5 players skip by literal count', () => {
+    const state = makePlayingState({
+      hands: [[card('8', 'spades'), card('8', 'diamonds')], [], [], [], []],
+      pile: [card('5', 'hearts')],
+    });
+    const r = unwrap(
+      applyAction(state, {
+        type: 'shi.play',
+        playerId: 'a',
+        source: 'hand',
+        cards: [card('8', 'spades'), card('8', 'diamonds')],
+      }),
+    );
+    expect(r.currentPlayerIdx).toBe(3); // skip B, C → D
+  });
+
+  it('chained 8s accumulate for the literal-count rule too', () => {
+    // 4 players: one 8 then a chained second must land where playing both
+    // at once would have (D), not where a second lone 8 would (C).
+    const state = makePlayingState({
+      hands: [[card('8', 'spades')], [], [], []],
+      pile: [card('5', 'hearts')],
+      deck: [card('8', 'diamonds')],
+    });
+    const first = unwrap(
+      applyAction(state, {
+        type: 'shi.play',
+        playerId: 'a',
+        source: 'hand',
+        cards: [card('8', 'spades')],
+      }),
+    );
+    expect(first.currentPlayerIdx).toBe(2);
+    expect(first.quickChainEligible).toEqual({ playerId: 'a', rank: '8' });
+
+    const second = unwrap(
+      applyAction(first, {
+        type: 'shi.play',
+        playerId: 'a',
+        source: 'hand',
+        cards: [card('8', 'diamonds')],
+      }),
+    );
+    expect(second.currentPlayerIdx).toBe(3);
+  });
+
+  it('another player acting resets the 8 streak', () => {
+    const state = makePlayingState({
+      hands: [[card('8', 'spades')], [card('9', 'clubs')], []],
+      pile: [card('5', 'hearts')],
+    });
+    const afterA = unwrap(
+      applyAction(state, {
+        type: 'shi.play',
+        playerId: 'a',
+        source: 'hand',
+        cards: [card('8', 'spades')],
+      }),
+    );
+    expect(afterA.currentPlayerIdx).toBe(2);
+    // C has nothing playable, so hand the turn to B via an explicit take
+    // and confirm B's ordinary play wipes A's streak.
+    const afterB = unwrap(
+      applyAction(
+        { ...afterA, currentPlayerIdx: 1 },
+        {
+          type: 'shi.play',
+          playerId: 'b',
+          source: 'hand',
+          cards: [card('9', 'clubs')],
+        },
+      ),
+    );
+    expect(afterB.eightChain).toBeNull();
+  });
+});
+
+// ----- Combined hand + faceUp burn ---------------------------------------
+
+describe('Shithead: combined hand+faceUp burn', () => {
+  it('burns 2 hand + 2 faceUp of a rank in one move when the deck is empty', () => {
+    const state = makePlayingState({
+      hands: [[card('5', 'spades'), card('5', 'hearts')], [card('K', 'clubs')]],
+      faceUp: [[card('5', 'diamonds'), card('5', 'clubs')], []],
+      pile: [card('9', 'hearts')],
+      deck: [],
+    });
+    const r = unwrap(
+      applyAction(state, {
+        type: 'shi.burst',
+        playerId: 'a',
+        source: 'handAndFaceUp',
+        cards: [
+          card('5', 'spades'),
+          card('5', 'hearts'),
+          card('5', 'diamonds'),
+          card('5', 'clubs'),
+        ],
+      }),
+    );
+    expect(r.pile).toHaveLength(0);
+    expect(r.burnedPile).toHaveLength(5); // 9H + four 5s
+    expect(r.players[0]!.hand).toHaveLength(0);
+    expect(r.players[0]!.faceUp).toHaveLength(0);
+    expect(r.currentPlayerIdx).toBe(0); // burner keeps the turn
+  });
+
+  it('burns 3 hand + 1 faceUp of a rank when the deck is empty', () => {
+    const state = makePlayingState({
+      hands: [
+        [card('9', 'spades'), card('9', 'hearts'), card('9', 'diamonds')],
+        [card('K', 'clubs')],
+      ],
+      faceUp: [[card('9', 'clubs')], []],
+      pile: [card('J', 'hearts')],
+      deck: [],
+    });
+    const r = unwrap(
+      applyAction(state, {
+        type: 'shi.burst',
+        playerId: 'a',
+        source: 'handAndFaceUp',
+        cards: [
+          card('9', 'spades'),
+          card('9', 'hearts'),
+          card('9', 'diamonds'),
+          card('9', 'clubs'),
+        ],
+      }),
+    );
+    expect(r.pile).toHaveLength(0);
+    expect(r.burnedPile).toHaveLength(5);
+    expect(r.players[0]!.hand).toHaveLength(0);
+    expect(r.players[0]!.faceUp).toHaveLength(0);
+  });
+
+  it('rejects a combined burn while the draw deck still has cards', () => {
+    const state = makePlayingState({
+      hands: [[card('5', 'spades'), card('5', 'hearts')], [card('K', 'clubs')]],
+      faceUp: [[card('5', 'diamonds'), card('5', 'clubs')], []],
+      pile: [card('9', 'hearts')],
+      deck: [card('2', 'clubs')],
+    });
+    const r = applyAction(state, {
+      type: 'shi.burst',
+      playerId: 'a',
+      source: 'handAndFaceUp',
+      cards: [
+        card('5', 'spades'),
+        card('5', 'hearts'),
+        card('5', 'diamonds'),
+        card('5', 'clubs'),
+      ],
+    });
+    expect(r.ok).toBe(false);
+  });
+
+  it('rejects a combined burn that would leave other cards in hand', () => {
+    // Hand 6,6,7 + face-up 6,6. Burning the four 6s strands the 7, so the
+    // player must play the 7 first.
+    const state = makePlayingState({
+      hands: [
+        [card('6', 'spades'), card('6', 'hearts'), card('7', 'clubs')],
+        [card('K', 'clubs')],
+      ],
+      faceUp: [[card('6', 'diamonds'), card('6', 'clubs')], []],
+      pile: [card('5', 'hearts')],
+      deck: [],
+    });
+    const r = applyAction(state, {
+      type: 'shi.burst',
+      playerId: 'a',
+      source: 'handAndFaceUp',
+      cards: [
+        card('6', 'spades'),
+        card('6', 'hearts'),
+        card('6', 'diamonds'),
+        card('6', 'clubs'),
+      ],
+    });
+    expect(r.ok).toBe(false);
+  });
+
+  it('allows the same combined burn once the odd card is gone', () => {
+    // Same shape as above minus the 7 — now the burn takes the whole hand.
+    const state = makePlayingState({
+      hands: [[card('6', 'spades'), card('6', 'hearts')], [card('K', 'clubs')]],
+      faceUp: [[card('6', 'diamonds'), card('6', 'clubs')], []],
+      pile: [card('5', 'hearts')],
+      deck: [],
+    });
+    const r = unwrap(
+      applyAction(state, {
+        type: 'shi.burst',
+        playerId: 'a',
+        source: 'handAndFaceUp',
+        cards: [
+          card('6', 'spades'),
+          card('6', 'hearts'),
+          card('6', 'diamonds'),
+          card('6', 'clubs'),
+        ],
+      }),
+    );
+    expect(r.pile).toHaveLength(0);
+    expect(r.players[0]!.hand).toHaveLength(0);
+    expect(r.players[0]!.faceUp).toHaveLength(0);
+  });
+
+  it('rejects a combined move that does not complete a burn', () => {
+    // Two 4s on an empty pile would pass as a classic 4-burst from a
+    // single source, but combining hand + faceUp is burn-only.
+    const state = makePlayingState({
+      hands: [[card('4', 'spades')], [card('K', 'clubs')]],
+      faceUp: [[card('4', 'diamonds')], []],
+      pile: [],
+      deck: [],
+    });
+    const r = applyAction(state, {
+      type: 'shi.burst',
+      playerId: 'a',
+      source: 'handAndFaceUp',
+      cards: [card('4', 'spades'), card('4', 'diamonds')],
+    });
+    expect(r.ok).toBe(false);
+  });
+});
+
+// ----- Out-of-turn burst with magic ranks --------------------------------
+
+describe('Shithead: out-of-turn burst with 2s and 3s', () => {
+  it('lets an off-turn player burn 2s that complete a run left by someone else', () => {
+    // It is C's turn. A holds two 2s and the pile top is a run of two 2s,
+    // so A can break in, burn, and take the turn.
+    const state = makePlayingState({
+      hands: [[card('2', 'spades'), card('2', 'hearts')], [], [card('K', 'clubs')]],
+      pile: [card('9', 'hearts'), card('2', 'diamonds'), card('2', 'clubs')],
+      currentPlayerIdx: 2,
+    });
+    const r = unwrap(
+      applyAction(state, {
+        type: 'shi.burst',
+        playerId: 'a',
+        source: 'hand',
+        cards: [card('2', 'spades'), card('2', 'hearts')],
+      }),
+    );
+    expect(r.pile).toHaveLength(0);
+    expect(r.burnedPile).toHaveLength(5); // 9H + four 2s
+    expect(r.players[0]!.hand).toHaveLength(0);
+    expect(r.currentPlayerIdx).toBe(0); // burning steals the turn
+  });
+
+  it('lets an off-turn player burn 3s the same way', () => {
+    const state = makePlayingState({
+      hands: [[card('3', 'spades')], [], [card('K', 'clubs')]],
+      pile: [
+        card('9', 'hearts'),
+        card('3', 'diamonds'),
+        card('3', 'clubs'),
+        card('3', 'hearts'),
+      ],
+      currentPlayerIdx: 2,
+    });
+    const r = unwrap(
+      applyAction(state, {
+        type: 'shi.burst',
+        playerId: 'a',
+        source: 'hand',
+        cards: [card('3', 'spades')],
+      }),
+    );
+    expect(r.pile).toHaveLength(0);
+    expect(r.currentPlayerIdx).toBe(0);
+  });
+
+  it('still rejects an off-turn 2 that does not complete a four-in-a-row', () => {
+    const state = makePlayingState({
+      hands: [[card('2', 'spades')], [], [card('K', 'clubs')]],
+      pile: [card('9', 'hearts'), card('2', 'diamonds')],
+      currentPlayerIdx: 2,
+    });
+    const r = applyAction(state, {
+      type: 'shi.burst',
+      playerId: 'a',
+      source: 'hand',
+      cards: [card('2', 'spades')],
+    });
+    expect(r.ok).toBe(false);
   });
 });
 
@@ -1847,6 +2261,7 @@ describe('Shithead: game-end + restart penalty', () => {
       currentPlayerIdx: 2,
       pendingJokerChooserId: null,
       quickChainEligible: null,
+      eightChain: null,
       outOrder: ['a', 'b'],
       loser: 'c',
       endReason: 'normal',
